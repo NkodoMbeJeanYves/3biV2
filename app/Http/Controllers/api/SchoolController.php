@@ -400,18 +400,51 @@ class SchoolController extends Controller
      * @Comment retrieve a school by its identifer
      */
     public function find($param){
-        //$this->setHeaderMethod('GET');
-        if(is_null($param))
-            $school = school::all();
-        else
-            $school = school::orwhere('school_id','like','%'.$param.'%')
-                            ->orwhere('name','like','%'.$param.'%')
-                            ->orwhere('description','like','%'.$param.'%')
-                            ->get();
+        
+        // find school related to id and customize it
+        $school = $this->customize($param);
         if (is_null($school))
             return response()->json(['data'=> [], 'status' => 201]);
         else
             return response()->json($school); 
+            
+    }
+
+    /**
+    *   @Comment customize school
+    *
+    */
+    public function customize($param){
+        $school = school::orwhere('school_id','like','%'.$param.'%')
+                        ->orwhere('name','like','%'.$param.'%')
+                        ->orwhere('description','like','%'.$param.'%')
+                        ->first();
+        $sub_events = sub_event::all();
+        $channels = channel::all();
+        $registrations = registration_class::query();
+
+        # code...
+        # fetch school lastEvent in date
+        //$school->LastEvent = $school->lastEvent();
+
+        $lastEvent_id = $school->LastEvent != null ? $school->LastEvent->event_id : NUll;
+
+        $school->periods = $this->loadSchoolPeriods($school->school_id);
+        $school->ValidPeriod = $this->checkIfPeriodisInAccordWithProvidedClassDuration($school);
+        $school->sub_events = $sub_events;
+        if( $school->school_type == 'UNIVERSITY'){
+            $school->channels = $channels;
+            $school->channel_count = count($channels);
+        } else {
+            # fetch remaining seat to each class
+            $school_registration_class = $registrations;
+            foreach($school->classes as $classe){
+                $school_registration_class->where('event_id', $lastEvent_id)->where('class_id', $classe->class_id);
+                $classe->current_seat = $school_registration_class->count();
+            }
+        }
+
+        return $school;
             
     }
 

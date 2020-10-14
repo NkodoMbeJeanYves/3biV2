@@ -49,40 +49,90 @@ class Controller extends BaseController
         # retrieve file name if it already exists
         $fullpath = ("\App\Models\\$model")::find($primaryColValue)->file;
         # switch size via model
-        switch ($tableName) {
-            case 'profiles' || 'students':
-                # resize using profile component width = 200, height = 200
-                $img = Image::make($image)->resize(200, 200);
-                break;
-
-            case 'schools':
-                $img = Image::make($image);
-                break;
-            default:
-                # code...
-                $img = Image::make($image)->resize(200, 200);
-                break;
-        }
+        
 
         if ($fullpath){
             # delete older file
             $fileName = explode('/', $fullpath)[4];
             file_put_contents('pwd.txt', $originalpath.'/'.$fileName);
             // do not delete default file 
-            if($fileName != 'default.png') unlink($originalpath.'/'.$fileName);                
+            if($fileName != 'default.png'){
+                // Value is not URL but directory file path
+                if(File::exists($originalpath.'/'.$fileName)) {
+                    File::delete($originalpath.'/'.$fileName);
+                    // Storage::delete($originalpath.'/'.$fileName);
+                }
+                // unlink($originalpath.'/'.$fileName); 
+             }                
         }else{
             $this->createDirecrotoryUnderStoragePath($partialPathName);
         }
         # set new fileName
-        $fileName = time().'.'.$image->getClientOriginalExtension();
+        // $fileName = time().'.'.$image->getClientOriginalExtension();
         # save new file
-        $img->save($originalpath.'/'.$fileName);
+        $fileName = $this->saveImage($tableName, $request);
+        // $img->save($originalpath.'/'.$fileName);
         $fullNameUnderPublicPath = $partialPathName.'/'.$fileName;
         DB::table($tableName)->where($primaryColName, $primaryColValue)->update(['file' => $fullNameUnderPublicPath]);
         return response()->json($fullNameUnderPublicPath);
         
       }
       return response()->json('Any file provided');
+    }
+    
+    function saveImage($tableName, Request $request){
+
+
+        $image = $request->file('file');
+        $ext = $image->getClientOriginalExtension();
+        $imagename = time().'.'.$ext;
+
+        switch ($tableName) {
+            case 'profiles' || 'students':
+                # resize using profile component width = 200, height = 200
+                if($tableName == 'profiles'){
+                    $destinationPath = public_path('/storage/images/'.$tableName.'/thumbnails');
+                    $thumb_img = Image::make($image->getRealPath())->resize(100, 100);
+                    $thumb_img->save($destinationPath.'/'.$imagename,80);
+                }
+
+                $destinationPath = public_path('/storage/images/'.$tableName);
+                $img = Image::make($image->getRealPath())->resize(200, 200); //$_FILES['file']['tmp_name']
+                // $f = $img->save($destinationPath.'/'.$imagename);
+                // return $f->basename;
+                /*$photo->move($destinationPath, $imagename);
+
+                $destinationPath = storage_path('app/public/images/'.$tableName);
+                
+                $img->save($destinationPath.'/'.$imagename);*/
+                break;
+
+            case 'schools':
+                $img = Image::make($image->getRealPath());
+                // $destinationPath = URL::to('public/images/categories');
+                $destinationPath = storage_path('app/public/images/'.$tableName);
+                // $img = Image::make($image);
+                // $img->save($destinationPath.'/'.$imagename);
+                break;
+            default:
+                # code...
+                $img = Image::make($image)->resize(200, 200);
+                // $destinationPath = URL::to('public/images/categories');
+                $destinationPath = storage_path('app/public/images/'.$tableName);
+                // $img = Image::make($image);
+                // $img->save($destinationPath.'/'.$imagename);
+                break;
+        }
+        
+
+        /*$img->resize(100, 100, function ($constraint) {
+            $constraint->aspectRatio();
+        })->save($destinationPath.'/'.$imagename);*/
+
+        // $destinationPath = URL::to('public/storage/images/'.$tableName);
+        
+
+        return ($img->save($destinationPath.'/'.$imagename))->basename;
     }
 
 
