@@ -45,13 +45,13 @@ class Controller extends BaseController
         $image = $request->file('file'); 
         $partialPathName = '/storage/images/'.$tableName;
         // check if it is possible to store image in originalpath by creating it
-        $originalpath = public_path($partialPathName);
+        // $originalpath = public_path($partialPathName);
         # retrieve file name if it already exists
-        $fullpath = ("\App\Models\\$model")::find($primaryColValue)->file;
+        // $fullpath = ("\App\Models\\$model")::find($primaryColValue)->file;
         # switch size via model
         
-
-        if ($fullpath){
+        # Decommentez le bloc suivant si vous ne voulez pas creer les dossier manuellement.
+        /*if ($fullpath){
             # delete older file
             $fileName = explode('/', $fullpath)[4];
             file_put_contents('pwd.txt', $originalpath.'/'.$fileName);
@@ -66,11 +66,12 @@ class Controller extends BaseController
              }                
         }else{
             $this->createDirecrotoryUnderStoragePath($partialPathName);
-        }
-        # set new fileName
-        // $fileName = time().'.'.$image->getClientOriginalExtension();
+        }*/
+
+
+        // $fileName = explode('/', $fullpath)[4];
         # save new file
-        $fileName = $this->saveImage($tableName, $request);
+        $fileName = $this->saveImage($tableName, $request, $model);
         // $img->save($originalpath.'/'.$fileName);
         $fullNameUnderPublicPath = $partialPathName.'/'.$fileName;
         DB::table($tableName)->where($primaryColName, $primaryColValue)->update(['file' => $fullNameUnderPublicPath]);
@@ -79,13 +80,24 @@ class Controller extends BaseController
       }
       return response()->json('Any file provided');
     }
+
+
     
-    function saveImage($tableName, Request $request){
-
-
+    function saveImage($tableName, Request $request, $model) {
+        // get primaryColumn Value
+        $primaryColValue = $request['primaryColValue'];
+        // get file fullpath
+        $fullpath = ("\App\Models\\$model")::find($primaryColValue)->file;
+        // get image
         $image = $request->file('file');
+        // get extension file
         $ext = $image->getClientOriginalExtension();
-        $imagename = time().'.'.$ext;
+        // check if file already exists or not
+        if (is_null($fullpath)){
+            $imagename = time().'.'.$ext;
+        } else {
+            $imagename = explode('/', $fullpath)[4]; 
+        }
 
         switch ($tableName) {
             case 'profiles' || 'students':
@@ -109,8 +121,8 @@ class Controller extends BaseController
 
             case 'schools':
                 $img = Image::make($image->getRealPath());
-                // $destinationPath = URL::to('public/images/categories');
-                $destinationPath = storage_path('app/public/images/'.$tableName);
+                $destinationPath = public_path('/storage/images/'.$tableName);
+                // $destinationPath = storage_path('app/public/images/'.$tableName);
                 // $img = Image::make($image);
                 // $img->save($destinationPath.'/'.$imagename);
                 break;
@@ -118,7 +130,9 @@ class Controller extends BaseController
                 # code...
                 $img = Image::make($image)->resize(200, 200);
                 // $destinationPath = URL::to('public/images/categories');
-                $destinationPath = storage_path('app/public/images/'.$tableName);
+                $destinationPath = public_path('/storage/images/'.$tableName);
+                
+                // $destinationPath = storage_path('app/public/images/'.$tableName);
                 // $img = Image::make($image);
                 // $img->save($destinationPath.'/'.$imagename);
                 break;

@@ -13,6 +13,15 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
+Route::get('symlink', function(){
+	$targetFolder = $_SERVER['DOCUMENT_ROOT'].'/../storage/app/public';
+	echo "$targetFolder";
+	$linkFolder = $_SERVER['DOCUMENT_ROOT'].'/public/storage';
+	echo "$linkFolder";
+	//symlink($targetFolder,$linkFolder);
+	echo 'Symlink process successfully completed';
+});
+
 Route::get('/', function () {
     return view('welcome');
 });

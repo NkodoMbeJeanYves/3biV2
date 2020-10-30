@@ -27,9 +27,9 @@ class period extends Model
         'period_id',
         'day',
         'period_type',
-        'description',
         'start_time',
         'end_time',
+        'event_id',
         'school_id'
     ];
 

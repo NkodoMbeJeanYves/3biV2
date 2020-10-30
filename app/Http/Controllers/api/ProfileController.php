@@ -16,7 +16,9 @@ class ProfileController extends Controller
     *   Get class depending on provided school
     */
     public function getSchoolProfiles(string $school_id){
-        $profiles = profile::where('school_id', $school_id)->get();
+        $profiles = profile::where('school_id', $school_id)
+        ->orderBy('profile_name','ASC')
+        ->get();
         return response()->json($profiles);
     }
 
@@ -80,7 +82,7 @@ class ProfileController extends Controller
                      'profile_phone'        => $formData->profile_phone,
                      'profile_phone_2'      => $formData->profile_phone_2?? NULL,
                      'role'                 => $formData->role,
-                     'is_checked'           => $formData->role ?? 1,
+                     'is_checked'           => $formData->is_checked ?? 1,
                      'school_id'            => $formData->school_id
                  ]); 
         $profile->save();   // persisted 
@@ -145,7 +147,7 @@ class ProfileController extends Controller
                      'profile_phone'        => $formData->profile_phone,
                      'profile_phone_2'      => $formData->profile_phone_2?? NULL,
                      'role'                 => $formData->role,
-                     'is_checked'           => !$formData->role,
+                     'is_checked'           => $formData->is_checked ?? 1,
                      'school_id'            => $formData->school_id
                  ]); 
              

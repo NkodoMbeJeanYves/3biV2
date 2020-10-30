@@ -12,6 +12,7 @@ use App\Models\profile;
 use App\Models\period_lecturer;
 use App\Models\day;
 use App\Models\classe;
+use App\Models\event;
 use App\Models\classroom;
 use App\Models\scheduled_class as scheduledClass;
 use App\Models\scheduled_class_period as scheduledClassPeriod;
@@ -20,15 +21,46 @@ use Carbon\Carbon;
 
 class PeriodController extends Controller
 {
+    public function fork(){
+        $refValues = [];
+        DB::transaction(function() use(&$refValues) {
+            $refValues = period_course::where('deleted_at',Null)->delete();
+            $all = DB::table('scheduled_class')
+                        ->join('scheduled_class_periods','scheduled_class_periods.scheduled_class_id','=','scheduled_class.scheduled_class_id')
+                        ->select('class_id', 'classroom_id', 'profile_id', 'course_id', 'period_id', 'scheduled_class_period_id','scheduled_class_periods.scheduled_class_id')
+                        ->orderBy('scheduled_class_id')
+                        ->get(); 
+            foreach ($all as $key => $line) {
+                period_course::updateOrCreate(
+                                            [
+                                                'period_id' =>  $line->period_id,
+                                                'course_id' =>  $line->course_id,
+                                                'scheduled_class_period'    =>  $line->scheduled_class_period_id
+                                            ]
+                                        );
+            }
+            
+            $refValues = period_course::all();
+        });
+        return response()->json($refValues);
 
-
+    }
 
     /**
      *  @comment load all relation | scheduled_class -- scheduled_class_periods
      */
     public function loadRelationShip(string $school_id){
         # Array of period related to current school
-        $periods = period::where('school_id', $school_id)->pluck('period_id');
+        $event = event::where('school_id', $school_id)->latest()->first();
+        
+        if(is_null($event)){
+            $data = [];
+            return response()->json($data); 
+        }
+
+        $periods = period::where('school_id', $school_id)
+                            ->where('event_id', $event->event_id)
+                            ->pluck('period_id');
 
         $results = DB::table('scheduled_class')
                       ->join('scheduled_class_periods','scheduled_class_periods.scheduled_class_id','=','scheduled_class.scheduled_class_id')
@@ -42,6 +74,17 @@ class PeriodController extends Controller
      * @comment load periods with all relationShip related with current school
      */
     public function loadSchoolPeriods(string $school_id){
+        $event = event::where('school_id', $school_id)->latest()->first();
+        
+        if(is_null($event)){
+            $data = [
+                        'periodGroupedByStartTime'   =>  [],
+                        'periodkeyById' =>  []
+                    ];
+
+            return response()->json($data); 
+        }
+
         $results = [];
 /*        $periods = period::with([
                                     'lecturers'    =>  function ($query) {
@@ -63,7 +106,13 @@ class PeriodController extends Controller
                 'courses',
                 'classrooms',
                 'classes'  
-            ])->where('school_id', $school_id)->orderBy('period_type')->orderBy('start_time')->orderBy('day')->get();
+            ])->where('school_id', $school_id)
+                ->where('event_id', $event->event_id)
+                ->orderBy('period_type')
+                ->orderBy('start_time')
+                ->orderBy('day')
+                ->get();
+
         $start_times = period::where('school_id', $school_id)->distinct()->get('start_time');
         
         $r = []; $a =[];
@@ -111,7 +160,8 @@ class PeriodController extends Controller
      * @return \Illuminate\Http\Response
      */
     public function index()
-    {   $scheduled_class = scheduledClass::all();
+    {   
+        $scheduled_class = scheduledClass::all();
         $scheduled_class_periods = scheduledClassPeriod::all();
         foreach ($scheduled_class_periods as $key => $value) {
             # code...
@@ -139,7 +189,9 @@ class PeriodController extends Controller
                 'course_id'   =>  scheduledClass::find($scheduled_class)->course_id
             ]);
         }
+
         $periods = period::all();
+
         return response()->json($periods);
     }
 
@@ -148,6 +200,15 @@ class PeriodController extends Controller
      * @comment load periods with all relationShip related with current school
      */
     public function loadSchoolPartialsPeriods(string $school_id, Array $_periods){
+
+        $event = event::where('school_id', $school_id)->latest()->first();
+        
+        if(is_null($event)){
+            $data = [];
+
+            return $data; 
+        }
+
         $results = [];
 /*        $periods = period::with([
                                     'lecturers'    =>  function ($query) {
@@ -164,12 +225,19 @@ class PeriodController extends Controller
                                                                       }
                                 ]*/
         $periods = period::with(
-            [
-                'lecturers',
-                'courses',
-                'classrooms',
-                'classes'  
-            ])->where('school_id', $school_id)->whereIN('period_id', $_periods)->orderBy('period_type')->orderBy('start_time')->orderBy('day')->get();
+                                [
+                                    'lecturers',
+                                    'courses',
+                                    'classrooms',
+                                    'classes'  
+                                ])->where('school_id', $school_id)
+                                    ->where('event_id', $event->event_id)
+                                    ->whereIN('period_id', $_periods)
+                                    ->orderBy('period_type')
+                                    ->orderBy('start_time')
+                                    ->orderBy('day')
+                                    ->get();
+
         $start_times = period::where('school_id', $school_id)->whereIN('period_id', $_periods)->distinct()->get('start_time');
         
         $r = []; $a =[];
@@ -243,48 +311,34 @@ class PeriodController extends Controller
             });
 
 
-        # deletion process
-        if ($formData->action == 'delete'){
-            $deletedNotices = $this->proceedOverDeleteAction($formData);
-        }
-        
-        # on doit gerer le cas ou plusieurs enseignants interviennent pour la même matière
-
         #   1 - On recupere le numero des lignes concernant la classe, la salle et la matiere | scheduled_class
         $relatedPeriods = [];
         # store messages telling that class or classroom are not available during update operation
         $availabilitiesMessages = [];
-        
-        if ($formData->action == 'update'){
+
+        # deletion process
+        if ($formData->action == 'delete'){
+            $deletedNotices = $this->proceedOverDeleteAction($formData);
+        } else {
             $res = $this->proceedOverUpdateAction2($formData, $results['periodkeyById'], $days, $Classes, $Classrooms, $Lecturers);
             // $relatedPeriods = $res['relatedPeriods'];
             $availabilitiesMessages = $res['availabilitiesMessages'];
         }
         
+        # on doit gerer le cas ou plusieurs enseignants interviennent pour la même matière
+
+        
 
         $displayedErrors = [];
-        // make array' errors
-        /*foreach ($results['periodGroupedByStartTime'] as $arrayPeriod) {
-            # code...
-            foreach ($arrayPeriod as $period) {
-                # code...
-                foreach ($relatedPeriods as $relatedPeriod) {
-                    # code...
-                    if($relatedPeriod == $period){
-                        $msg = 'Period of '.$days[$period->day].' starting at '.$period->start_time.' and ending at '.$period->end_time.' already related';
-                        $displayedErrors[] = $msg;
-                    }
-                }
-            }
-        }*/ 
+        
 
         # display errors
-        if($formData->action == 'delete'){
-            return response()->json(['data' => $results, 'status' => 201, 'errors' => $deletedNotices ]);
-        }else{
+        if($formData->action == 'delete') {
+            return response()->json(['data' => $results, 'status' => 205, 'errors' => $deletedNotices ]);
+        } else {
             return response()->json([
                 'data' => $results['periodGroupedByStartTime'],
-                'status' => 201, 
+                'status' => 200, 
                 'errors' => [],//$this->loadSchoolPartialsPeriods($school_id, $formData->periods), 
                 'availabilitiesMessages' => $availabilitiesMessages 
             ]);
@@ -341,74 +395,90 @@ class PeriodController extends Controller
                     # code...
                     # create new link 
                     # on crée la nouvelle ligne ou on met à jour
-                    $check = scheduledClass::where([
+                   /* $check = scheduledClass::where([
                                             'class_id'      =>  $formData->class_id,
                                             'profile_id'    =>  $formData->lecturer_id,
                                             'classroom_id'  =>  $formData->classroom_id,
                                             'course_id'     =>  $formData->course_id
                                         ])->exists();
-
+   
+*/
                     
-                    $theNewOne = scheduledClass::updateOrCreate(
+                    # Transaction begins
+                    DB::transaction(function () use($formData, $period){
+                        $theNewOne = scheduledClass::updateOrCreate(
                                         [
                                             'class_id'      =>  $formData->class_id,
                                             'profile_id'    =>  $formData->lecturer_id,
                                             'classroom_id'  =>  $formData->classroom_id,
                                             'course_id'     =>  $formData->course_id 
                                         ]
-                                    );    
+                                    ); 
 
-                    $check = scheduledClassPeriod::where([
+                        $check = scheduledClassPeriod::where([
                                             'scheduled_class_id'      =>  $theNewOne->scheduled_class_id,
                                             'period_id'               =>  $period,
                                         ])->exists();
-                    if (!$check){
-                        scheduledClassPeriod::Create(
+                        // We need to store id in period_course
+                        $scheduledClassPeriod = null;
+
+                        if (!$check){
+                            $scheduledClassPeriod = scheduledClassPeriod::updateOrCreate(
+                                [
+                                    'scheduled_class_id'      =>  $theNewOne->scheduled_class_id,
+                                    'period_id'               =>  $period,
+                                ]);
+                        }
+                        
+                        #  update period_lecturers relationShip
+                        #  $model = period_lecturer::where('period_id', $period)->where('lecturer_id', $scheduled_class_object->profile_id)->first();
+
+                        # Transaction Begins here
+                        period_lecturer::updateOrCreate(
                             [
-                                'scheduled_class_id'      =>  $theNewOne->scheduled_class_id,
-                                'period_id'               =>  $period,
+                                'period_id'      =>  $period,
+                                'lecturer_id'    =>  $formData->lecturer_id
+                            ],
+                            [
+                                'lecturer_id'    =>  $formData->lecturer_id,
+                                'period_id'      =>  $period
                             ]);
-                    }
-                    
-                    #  update period_lecturers relationShip
-                    #  $model = period_lecturer::where('period_id', $period)->where('lecturer_id', $scheduled_class_object->profile_id)->first();
-                    period_lecturer::updateOrCreate(
-                        [
-                            'period_id'      =>  $period,
-                            'lecturer_id'    =>  $formData->lecturer_id
-                        ],
-                        [
-                            'lecturer_id'    =>  $formData->lecturer_id,
-                            'period_id'      =>  $period
-                        ]);
 
 
-                    # store new period_class record
-                    period_class::updateOrCreate(
-                        [
-                            'period_id'      =>  $period,
-                            'class_id'       =>  $formData->class_id
-                        ]);
+                        # store new period_class record
+                        period_class::updateOrCreate(
+                            [
+                                'period_id'      =>  $period,
+                                'class_id'       =>  $formData->class_id
+                            ]);
+                        
+                        
+                        # store new period_classroom record
+                        period_classroom::updateOrCreate(
+                            [
+                                'period_id'      =>  $period,
+                                'classroom_id'   =>  $formData->classroom_id
+                            ]);
+                        
                     
-                    
-                    # store new period_classroom record
-                    period_classroom::updateOrCreate(
-                        [
-                            'period_id'      =>  $period,
-                            'classroom_id'   =>  $formData->classroom_id
-                        ]);
-                    
-                
+                        period_course::updateOrCreate(
+                                                        [
+                                                            'period_id'      =>  $period,
+                                                            'course_id'      =>  $formData->course_id,
+                                                            'scheduled_class_period' => $scheduledClassPeriod->scheduled_class_period_id
+                                                        ]);
+                    });
 
+                    
                     # check if record already exists
-                    $check = period_course::where('period_id', $period)->where('course_id', $formData->course_id)->first();
+                    /*$check = period_course::where('period_id', $period)->where('course_id', $formData->course_id)->first();
                     if(is_null($check)){
                         period_course::Insert(
                         [
                             'period_id'      =>  $period,
                             'course_id'      =>  $formData->course_id
                         ]);
-                    }
+                    }*/
                                                    
                 
             }
@@ -422,7 +492,7 @@ class PeriodController extends Controller
 
     }
 
-
+/*
     public function proceedOverUpdateAction($formData, $Periods, $Days, $Classes, $Classrooms, $Lecturers){
         
         $scheduled_class_ids = scheduledClass::where(
@@ -603,50 +673,54 @@ class PeriodController extends Controller
         ];
         return $res;    
     }
+    */
 
 
 
     public function proceedOverDeleteAction($formData){
+
         $scheduled_class_object = scheduledClass::where('class_id', $formData->class_id)
                                             ->where('classroom_id', $formData->classroom_id)
                                             ->where('course_id', $formData->course_id)
                                             ->where('profile_id', $formData->lecturer_id)
                                             ->first();
         $messageToLettingKnowThatEveryThingGoneWell = ['No need to delete!'];
-        if(!is_null($scheduled_class_object)){
 
-            # code...
-            scheduledClassPeriod::where('scheduled_class_id', $scheduled_class_object->scheduled_class_id)
-                                           ->whereIn('period_id', $formData->periods)
-                                           ->delete();
-            
-            $scheduled_class_object->delete();    
-            # relationShip first
-            period_lecturer::whereIn('period_id', $formData->periods)
-                           ->where('lecturer_id', $formData->lecturer_id)
-                           ->delete();  
-            period_classroom::whereIn('period_id', $formData->periods)
-                            ->where('classroom_id', $formData->classroom_id)
-                            ->delete(); 
-            period_class::whereIn('period_id', $formData->periods)
-                         ->where('class_id', $formData->class_id)
-                         ->delete();   
-            # before delete course, be sure that it is required anywhere
-            foreach ($formData->periods as $key => $period) {
-                $do_we_suppress =  DB::table('scheduled_class')
-                                    ->join('scheduled_class_periods','scheduled_class_periods.scheduled_class_id','=','scheduled_class.scheduled_class_id')
-                                    ->where('scheduled_class_periods.period_id', $period)
-                                    ->where('scheduled_class.course_id', $formData->course_id)
-                                    ->count();
-                if($do_we_suppress == 0){
-                    period_course::where('period_id', $period)
-                    ->where('course_id', $formData->course_id)
-                    ->delete();
-                }                    
-            }
+        if(!is_null($scheduled_class_object)){
+            # Transaction begins here
+            DB::transaction(function () use($formData, $scheduled_class_object){
+                # relationShip first
+                period_lecturer::whereIn('period_id', $formData->periods)
+                               ->where('lecturer_id', $formData->lecturer_id)
+                               ->delete();  
+                period_classroom::whereIn('period_id', $formData->periods)
+                                ->where('classroom_id', $formData->classroom_id)
+                                ->delete(); 
+                period_class::whereIn('period_id', $formData->periods)
+                             ->where('class_id', $formData->class_id)
+                             ->delete(); 
+
+                # store scheduled_class_period_id
+                $Involvedkeys = scheduledClassPeriod::where('scheduled_class_id', $scheduled_class_object->scheduled_class_id)
+                                               ->whereIn('period_id', $formData->periods)
+                                               ->pluck('scheduled_class_period_id');               
+
+                period_course::whereIn('period_id', $formData->periods)
+                             ->where('course_id', $formData->course_id)
+                             ->whereIn('scheduled_class_period', $Involvedkeys)
+                             ->delete();             
+                
+
+                scheduledClassPeriod::whereIn('scheduled_class_period_id', $Involvedkeys)->delete();
+                
+                //$scheduled_class_object->delete();
+            });
+
+        
                 
             $messageToLettingKnowThatEveryThingGoneWell = [count($formData->periods).' items deleted successfully! '];
         }
+
         return $messageToLettingKnowThatEveryThingGoneWell;
     }
 

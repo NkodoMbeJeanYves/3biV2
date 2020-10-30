@@ -17,7 +17,9 @@ class BuildingController extends Controller
     */
     public function getSchoolBuildings(string $school_id){
 
-        $buildings = building::where('school_id', $school_id)->get();
+        $buildings = building::where('school_id', $school_id)
+        ->orderBy('building_name','ASC')
+        ->get();
         return response()->json($buildings);
     }
 

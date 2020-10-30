@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers\api;
 
-use App\models\course;
+use App\Models\course;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use Validator;
@@ -15,7 +15,9 @@ class CourseController extends Controller
     */
     public function getSchoolCourses(string $school_id){
 
-        $courses = course::where('school_id', $school_id)->get();
+        $courses = course::where('school_id', $school_id)
+        ->orderBy('course_name','ASC')
+        ->get();
         return response()->json($courses);
     }
 

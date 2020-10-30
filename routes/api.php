@@ -25,15 +25,19 @@ Route::group([
 });
 
 
-Route::middleware('auth:api')->get('/user', function (Request $request) {
+/*Route::middleware('auth:api')->get('/user', function (Request $request) {
     return $request->user();
-});
+    // 
 
-# Main upload route
-Route::post('/upload', 'Controller@fileUpload');
+    ovh pass ovh = Ahrecccomupassword2020
+});*/
 
-# School Route
-Route::group(['prefix'	=>	'school'], function(){
+
+
+# Protected Routes
+Route::group(['middleware'=>'auth:api'], function(){
+	# School Route
+	Route::group(['prefix'	=>	'school'], function(){
 	Route::get('/','api\SchoolController@all');
 	Route::post('/','api\SchoolController@store');
 	Route::put('/{id}','api\SchoolController@update');
@@ -41,70 +45,77 @@ Route::group(['prefix'	=>	'school'], function(){
 	Route::get('/{id}','api\SchoolController@find');
 	Route::delete('/{id}','api\SchoolController@delete');	
 	
+	});
+
+	# Building Route
+	Route::apiResource('building','api\BuildingController');
+	Route::get('building/v1/{school_id}','api\BuildingController@getSchoolBuildings');
+
+
+
+	# Classe Route
+	Route::apiResource('classe','api\ClasseController');
+	Route::get('classe/v1/{school_id}','api\ClasseController@getSchoolClass');
+
+	# Classroom Route
+	Route::apiResource('classroom','api\ClassroomController');
+	Route::get('classroom/v1/{school_id}','api\ClassroomController@getSchoolClassrooms');
+
+	# Course Route
+	Route::apiResource('course','api\CourseController');
+	Route::get('course/v1/{school_id}','api\CourseController@getSchoolCourses');
+
+	# Profile Route
+	Route::apiResource('profile', 'api\ProfileController');
+	Route::get('profile/v1/{school_id}','api\ProfileController@getSchoolProfiles');
+
+
+	# Student Route
+	Route::apiResource('student','api\StudentController');
+	Route::get('student/v1/{school_id}','api\StudentController@getSchoolStudents');
+
+	# Period Route
+	Route::group(['prefix'	=>	'period'], function(){
+		Route::get('/','api\PeriodController@index');
+		Route::get('/v1/{school_id}','api\PeriodController@getSchoolPeriods');	
+		Route::post('/','api\PeriodController@store');	
+		Route::get('/v2/{school_id}', 'api\PeriodController@loadRelationShip');
+	});
+
+	# Event Route
+	Route::apiResource('event','api\EventController');
+	Route::get('event/v1/{school_id}','api\EventController@getSchoolEvents');
+	Route::post('event/sync/{id}','api\EventController@attach');
+
+	# Faculty Route
+	Route::apiResource('faculty','api\FacultyController');
+
+	# Department Route
+	Route::apiResource('department','api\DepartmentController');
+	Route::get('department/v1/{school_id}','api\DepartmentController@getSchoolDepartments');
+
+	# Channel Route
+	Route::apiResource('channel','api\ChannelController');
+
+	# Registration Route
+	Route::apiResource('registration','api\RegistrationController');
+	Route::get('registration/v1/{school_id}','api\RegistrationController@getSchoolRegistrations');
+
+	# Payment Route
+	Route::apiResource('payment','api\PaymentController');
+
+
 });
 
-# Building Route
-Route::apiResource('building','api\BuildingController');
-Route::get('building/v1/{school_id}','api\BuildingController@getSchoolBuildings');
+# Main upload route
+Route::post('/upload', 'Controller@fileUpload');
 
-# Classe Route
-Route::apiResource('classe','api\ClasseController');
-Route::get('classe/v1/{school_id}','api\ClasseController@getSchoolClass');
+# Current test Route
+Route::get('attendance/{school_id}', 'api\AttendanceController@getRegisteredStudents');
 
-# Classroom Route
-Route::apiResource('classroom','api\ClassroomController');
-Route::get('classroom/v1/{school_id}','api\ClassroomController@getSchoolClassrooms');
+// Caution : Do not apply it anymore Restructure database
+Route::get('fork', 'api\PeriodController@fork');
 
-# Course Route
-Route::apiResource('course','api\CourseController');
-Route::get('course/v1/{school_id}','api\CourseController@getSchoolCourses');
-
-# Profile Route
-Route::group(['prefix'	=>	'profile'], function(){
-	Route::get('/v1/{school_id}','api\ProfileController@getSchoolProfiles');
-	Route::resource('/', 'api\ProfileController');
-});
-
-# Student Route
-Route::group(['prefix'	=>	'student'], function(){
-	Route::get('/v1/{school_id}','api\StudentController@getSchoolStudents');
-	Route::resource('/','api\StudentController');
-});
-
-
-# Student Route
-Route::apiResource('student','api\StudentController');
-Route::get('student/v1/{school_id}','api\StudentController@getSchoolStudents');
-
-# Period Route
-Route::group(['prefix'	=>	'period'], function(){
-	Route::get('/','api\PeriodController@index');
-	Route::get('/v1/{school_id}','api\PeriodController@getSchoolPeriods');	
-	Route::post('/','api\PeriodController@store');	
-	Route::get('/v2/{school_id}', 'api\PeriodController@loadRelationShip');
-});
-
-# Event Route
-Route::apiResource('event','api\EventController');
-Route::get('event/v1/{school_id}','api\EventController@getSchoolEvents');
-Route::post('event/sync/{id}','api\EventController@attach');
-
-# Faculty Route
-Route::apiResource('faculty','api\FacultyController');
-
-# Department Route
-Route::apiResource('department','api\DepartmentController');
-Route::get('department/v1/{school_id}','api\DepartmentController@getSchoolDepartments');
-
-# Channel Route
-Route::apiResource('channel','api\ChannelController');
-
-# Registration Route
-Route::apiResource('registration','api\RegistrationController');
-Route::get('registration/v1/{school_id}','api\RegistrationController@getSchoolRegistrations');
-
-# Payment Route
-Route::apiResource('payment','api\PaymentController');
 
 
 # replicate .env file content and update DB_PASSWORD field

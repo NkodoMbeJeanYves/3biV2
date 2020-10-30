@@ -5,10 +5,15 @@ namespace App\Http\Controllers\api;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use App\Models\event;
+use App\Models\school;
+use App\Models\day;
+use App\Models\period;
 use App\Models\sub_event;
 use App\Models\event_sub_event;
 use Validator;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
+
 
 class EventController extends Controller
 {
@@ -31,6 +36,117 @@ class EventController extends Controller
     public function index()
     {
         //
+    }
+
+
+    /**
+    *@comment determiner le nombre de periodes elementaires entre l'heure de debut 
+    * et l'heure de fin des cours de l'ecole du model.
+    */
+    function findMultiplicateur(School $model){
+/*      $start_time = \Carbon\Carbon::createFromFormat('hh:mm:ss',$model->class_start_time);
+        $end_time = \Carbon\Carbon::createFromFormat('hh:mm:ss',$model->class_end_time);*/
+        $start_time = new Carbon($model->class_start_time);
+        $end_time = new Carbon($model->class_end_time);
+        $duration = $model->class_duration;
+        $delay = $start_time->diffInMinutes($end_time);
+        $multi =  intdiv($delay, $duration);
+        return $multi;
+    }
+
+
+    /**
+    * @Comment Create period related to last event
+    */
+    public function createPeriodsForThatModel(School $school, string $school_id, string $event_id){
+        $days = day::all();
+        $periods = [];
+
+        $multi = $this->findMultiplicateur($school) + 1; 
+
+           // elaboration des periodes
+           // days loop
+           for ($index = 0; $index  < count($days) ; $index++) { 
+            # code...
+            $ref_end_time = null;
+                for ($i=1; $i <= $multi ; $i++) { 
+                    # code...
+                    $period_start_time_in_minutes = ($school->class_duration)*($i-1);
+                    $period_end_time_in_minutes = ($school->class_duration)*$i;
+                    $period_start_time = $ref_end_time ?? (new Carbon($school->class_start_time))->addMinutes($period_start_time_in_minutes);
+                    $period_end_time = $ref_end_time ? (new Carbon($ref_end_time))->addMinutes($school->class_duration): (new Carbon($school->class_start_time))->addMinutes($period_end_time_in_minutes);
+
+                    $flag = false;
+                    # check if $period_end_time equal to any break start time then create that break period
+                    if ($period_start_time->eq(new Carbon($school->first_break_start_time))) {
+                        $flag = true;
+                        $periods[]  =   [
+                            'period_id' =>  'per'.$this->generate_Id(period::class),
+                            'day'       =>  $days[$index]->day_id,
+                            'start_time'=>  new Carbon($school->first_break_start_time),
+                            'end_time'  =>  (new Carbon($school->first_break_start_time))->addMinutes($school->first_break_duration),
+                            'period_type'=> 'break',
+                            'event_id'  =>  $event_id,
+                            'school_id'  => $school_id
+                        ];  
+                        $ref_end_time = (new Carbon($school->first_break_start_time))->addMinutes($school->first_break_duration);
+                    }
+
+                    if ($school->second_break_duration){
+                        if ($period_start_time->eq(new Carbon($school->second_break_start_time))) {
+                            $flag = true;
+                            $periods[]  =   [
+                                'period_id' =>  'per'.$this->generate_Id(period::class),
+                                'day'       =>  $days[$index]->day_id,
+                                'start_time'=>  new Carbon($school->second_break_start_time),
+                                'end_time'  =>  (new Carbon($school->second_break_start_time))->addMinutes($school->second_break_duration),
+                                'period_type'=> 'break',
+                                'event_id'  =>  $event_id,
+                                'school_id'  => $school_id
+                            ];  
+                            $ref_end_time = (new Carbon($school->second_break_start_time))->addMinutes($school->second_break_duration);
+                        }
+                    }
+                    
+                    if ($school->third_break_duration){
+                        if ($period_start_time->eq(new Carbon($school->third_break_start_time))) {
+                            $flag = true;
+                            $periods[]  =   [
+                                'period_id' =>  'per'.$this->generate_Id(period::class),
+                                'day'       =>  $days[$index]->day_id,
+                                'start_time'=>  new Carbon($school->third_break_start_time),
+                                'end_time'  =>  (new Carbon($school->third_break_start_time))->addMinutes($school->third_break_duration),
+                                'period_type'=> 'break',
+                                'event_id'  =>  $event_id,
+                                'school_id'  => $school_id
+                            ];  
+                            $ref_end_time = (new Carbon($school->third_break_start_time))->addMinutes($school->third_break_duration);
+                        }
+                    }
+                    
+                    if (!$flag){
+                        $periods[]  =   [
+                            'period_id' =>  'per'.$this->generate_Id(period::class),
+                            'day'       =>  $days[$index]->day_id,
+                            'start_time'=>  $period_start_time,
+                            'end_time'  =>  $period_end_time,
+                            'period_type'=> 'class',
+                            'event_id'  =>  $event_id,
+                            'school_id'  => $school_id
+                        ]; 
+                        $ref_end_time = $period_end_time;
+                    }
+                        
+                    
+
+                     
+                }
+            }
+        
+
+        period::insert($periods);   // persisted
+        return $periods;
+        
     }
 
 
@@ -95,20 +211,42 @@ class EventController extends Controller
                 return response()->json(['errors'=>$validator->errors(),'form-data'=>$formDataToCheck, 'status'=> 201]);
             }
     
+        // Preparing Transactions
         $event_id = 'evn'.$this->generate_Id(event::class);
+        // we are going to use reference variable
+        // the event value will be updated within the transaction
+        $event = event::find($event_id);
+
+        // Create school periods related to that event
+        $school = School::find($formData->school_id);
+        $school_id = $formData->school_id;
+
+        # Beginning Transaction
+        DB::transaction(function () use($formData, $school, $school_id, &$event, $event_id){
+            $event = event::create([
+                            'event_id'      => $event_id,
+                            'event_content' => $formData->event_content,
+                            'start_date'    => Carbon::parse($formData->start_date),
+                            'end_date'      => Carbon::parse($formData->end_date),
+                            'school_id'     => $formData->school_id
+                        ]); 
+
+            $event->fill(['event_id' => $event_id]); 
+
+            $sub_events = sub_event::all();
+            $event->sub_events()->attach($sub_events->pluck('sub_event_id')); 
+
+            
+            $this->createPeriodsForThatModel($school, $school_id, $event_id);
+
+        });
         
-        $event = event::create([
-                        'event_id'      => $event_id,
-                        'event_content' => $formData->event_content,
-                        'start_date'    => Carbon::parse($formData->start_date),
-                        'end_date'      => Carbon::parse($formData->end_date),
-                        'school_id'     => $formData->school_id
-                    ]); 
-        $event->fill(['event_id' => $event_id]);            
-        $sub_events = sub_event::all();
-        $event->sub_events()->attach($sub_events->pluck('sub_event_id')); 
-        //$event->sub_events = $sub_events;
-        $event = event::find($event_id);           
+
+        
+        # End Transaction
+        if (is_null($event)) {
+            return response()->json(['data' => $event, 'status' => 201]);
+        }           
         return response()->json(['data' => $event, 'status' => 200]);
     }
 

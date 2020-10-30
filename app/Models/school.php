@@ -58,23 +58,30 @@ class school extends Model
     }
 
     public function buildings(){
-        return $this->hasMany(building::class, 'school_id', 'school_id');
+        return $this->hasMany(building::class, 'school_id', 'school_id')
+        ->orderBy('building_name','ASC');
     }
 
+    # Classes Or fileds | Specialities
     public function classes(){
-        return $this->hasMany(classe::class, 'school_id', 'school_id');
+        return $this->hasMany(classe::class, 'school_id', 'school_id')
+        ->where('is_checked', 1)
+        ->orderBy('class_name','ASC');
     }    
 
     public function classrooms(){
-        return $this->hasMany(classroom::class, 'school_id', 'school_id');
+        return $this->hasMany(classroom::class, 'school_id', 'school_id')
+        ->orderBy('classroom_name', 'ASC');
     }
 
     public function profiles(){
-        return $this->hasMany(profile::class, 'school_id', 'school_id');
+        return $this->hasMany(profile::class, 'school_id', 'school_id')
+        ->orderBy('profile_name','ASC');
     }
 
     public function courses(){
-        return $this->hasMany(course::class, 'school_id', 'school_id');
+        return $this->hasMany(course::class, 'school_id', 'school_id')
+        ->orderBy('course_name','ASC');
     }
 
     # always fetch informations about last event in date

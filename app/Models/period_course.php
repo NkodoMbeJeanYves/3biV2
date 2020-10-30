@@ -20,6 +20,7 @@ class period_course extends Model
 
     protected $fillable = [
         'period_id',
-        'course_id'
+        'course_id',
+        'scheduled_class_period'
     ];
 }

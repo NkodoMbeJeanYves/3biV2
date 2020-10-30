@@ -16,7 +16,9 @@ class ClassroomController extends Controller
     */
     public function getSchoolClassrooms(string $school_id){
 
-        $classrooms = classroom::where('school_id', $school_id)->get();
+        $classrooms = classroom::where('school_id', $school_id)
+        ->orderBy('classroom_name','ASC')
+        ->get();
         return response()->json($classrooms);
     }
 
@@ -27,7 +29,7 @@ class ClassroomController extends Controller
      */
     public function index()
     {
-        $classrooms = classroom::all();
+        $classrooms = classroom::orderBy('classroom_name','ASC')->get();
         return response()->json($classrooms);
     }
 

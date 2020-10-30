@@ -11,6 +11,7 @@ use App\Models\classroom;
 use App\Models\registration_class;
 use App\Models\channel;
 use App\Models\day;
+use App\Models\event;
 use App\Models\sub_event;
 use App\Models\course;
 use Illuminate\Http\Request;
@@ -33,7 +34,7 @@ class SchoolController extends Controller
     }
 
     /**
-     * @comment load periods with all relationShip related with current school
+     * @comment load periods with all relationShip related with current school and last event
      */
     public function loadSchoolPeriods(string $school_id){
         $results = [];
@@ -51,6 +52,13 @@ class SchoolController extends Controller
                                                                         $query->where('period_class.deleted_at', NULL);
                                                                       }
                                 ]*/
+        // Last Event
+        $event = event::where('school_id', $school_id)->latest()->first();
+        
+        if(is_null($event)){
+            return []; 
+        }
+
         $periods = period::with(
             [
                 'lecturers',
@@ -58,7 +66,10 @@ class SchoolController extends Controller
                 'classrooms',
                 'classes'  
             ])->where('school_id', $school_id)->orderBy('period_type')->orderBy('start_time')->orderBy('day')->get();
-        $start_times = period::where('school_id', $school_id)->distinct()->get('start_time');
+        $start_times = period::where('school_id', $school_id)
+                        ->where('event_id', $event->event_id)
+                        ->distinct()
+                        ->get('start_time');
         
         $r = []; $a =[];
         foreach ($start_times as $key => $value) {
@@ -157,108 +168,8 @@ class SchoolController extends Controller
     }
 
 
-    public function createPeriodsForThatModel(School $school, string $school_id){
-        $days = day::all();
-        $periods = [];
 
-        $multi = $this->findMultiplicateur($school) + 1; 
-
-           // elaboration des periodes
-           // days loop
-           for ($index = 0; $index  < count($days) ; $index++) { 
-            # code...
-            $ref_end_time = null;
-                for ($i=1; $i <= $multi ; $i++) { 
-                    # code...
-                    $period_start_time_in_minutes = ($school->class_duration)*($i-1);
-                    $period_end_time_in_minutes = ($school->class_duration)*$i;
-                    $period_start_time = $ref_end_time ?? (new Carbon($school->class_start_time))->addMinutes($period_start_time_in_minutes);
-                    $period_end_time = $ref_end_time ? (new Carbon($ref_end_time))->addMinutes($school->class_duration): (new Carbon($school->class_start_time))->addMinutes($period_end_time_in_minutes);
-
-                    $flag = false;
-                    # check if $period_end_time equal to any break start time then create that break period
-                    if ($period_start_time->eq(new Carbon($school->first_break_start_time))) {
-                        $flag = true;
-                        $periods[]  =   [
-                            'period_id' =>  'per'.$this->generate_Id(period::class),
-                            'day'       =>  $days[$index]->day_id,
-                            'start_time'=>  new Carbon($school->first_break_start_time),
-                            'end_time'  =>  (new Carbon($school->first_break_start_time))->addMinutes($school->first_break_duration),
-                            'period_type'=> 'break',
-                            'school_id'  => $school_id
-                        ];  
-                        $ref_end_time = (new Carbon($school->first_break_start_time))->addMinutes($school->first_break_duration);
-                    }
-
-                    if ($school->second_break_duration){
-                        if ($period_start_time->eq(new Carbon($school->second_break_start_time))) {
-                            $flag = true;
-                            $periods[]  =   [
-                                'period_id' =>  'per'.$this->generate_Id(period::class),
-                                'day'       =>  $days[$index]->day_id,
-                                'start_time'=>  new Carbon($school->second_break_start_time),
-                                'end_time'  =>  (new Carbon($school->second_break_start_time))->addMinutes($school->second_break_duration),
-                                'period_type'=> 'break',
-                                'school_id'  => $school_id
-                            ];  
-                            $ref_end_time = (new Carbon($school->second_break_start_time))->addMinutes($school->second_break_duration);
-                        }
-                    }
-                    
-                    if ($school->third_break_duration){
-                        if ($period_start_time->eq(new Carbon($school->third_break_start_time))) {
-                            $flag = true;
-                            $periods[]  =   [
-                                'period_id' =>  'per'.$this->generate_Id(period::class),
-                                'day'       =>  $days[$index]->day_id,
-                                'start_time'=>  new Carbon($school->third_break_start_time),
-                                'end_time'  =>  (new Carbon($school->third_break_start_time))->addMinutes($school->third_break_duration),
-                                'period_type'=> 'break',
-                                'school_id'  => $school_id
-                            ];  
-                            $ref_end_time = (new Carbon($school->third_break_start_time))->addMinutes($school->third_break_duration);
-                        }
-                    }
-                    
-                    if (!$flag){
-                        $periods[]  =   [
-                            'period_id' =>  'per'.$this->generate_Id(period::class),
-                            'day'       =>  $days[$index]->day_id,
-                            'start_time'=>  $period_start_time,
-                            'end_time'  =>  $period_end_time,
-                            'period_type'=> 'class',
-                            'school_id'  => $school_id
-                        ]; 
-                        $ref_end_time = $period_end_time;
-                    }
-                        
-                    
-
-                     
-                }
-            }
-        
-
-        period::insert($periods);   // persisted
-        return $periods;
-        
-    }
-
-
-   /**
-    *@comment determiner le nombre de periodes elementaires entre l'heure de debut 
-    * et l'heure de fin des cours de l'ecole du model.
-    */
-    function findMultiplicateur(School $model){
-/*    	$start_time = \Carbon\Carbon::createFromFormat('hh:mm:ss',$model->class_start_time);
-    	$end_time = \Carbon\Carbon::createFromFormat('hh:mm:ss',$model->class_end_time);*/
-    	$start_time = new Carbon($model->class_start_time);
-    	$end_time = new Carbon($model->class_end_time);
-    	$duration = $model->class_duration;
-    	$delay = $start_time->diffInMinutes($end_time);
-    	$multi =  intdiv($delay, $duration);
-    	return $multi;
-    }
+   
 
 
     /**
@@ -367,7 +278,7 @@ class SchoolController extends Controller
 
          $school->save();   // persisted 
          // create period automatically
-         $school->periods = $this->createPeriodsForThatModel($school, $school_id);
+         // $school->periods = $this->createPeriodsForThatModel($school, $school_id);
          $school->buildings = $this->createBuildingsForThatModel($school, $school_id);
          $school->classrooms = $this->createClassroomsForThatModel($school, $school_id);
          $school->classes = $this->createClassForThatModel($school, $school_id);
@@ -399,10 +310,10 @@ class SchoolController extends Controller
     /**
      * @Comment retrieve a school by its identifer
      */
-    public function find($param){
+    public function find($school_id){
         
         // find school related to id and customize it
-        $school = $this->customize($param);
+        $school = $this->customize($school_id);
         if (is_null($school))
             return response()->json(['data'=> [], 'status' => 201]);
         else

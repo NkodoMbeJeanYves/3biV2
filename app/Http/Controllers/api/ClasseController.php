@@ -18,7 +18,9 @@ class ClasseController extends Controller
     */
     public function getSchoolClass(string $school_id){
 
-        $classes = classe::where('school_id', $school_id)->get();
+        $classes = classe::where('school_id', $school_id)
+        ->orderBy('class_name','ASC')
+        ->get();
         return response()->json($classes);
     }
 
