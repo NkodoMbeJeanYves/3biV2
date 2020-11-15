@@ -14,4 +14,14 @@ class teachered_channel extends Model
         'student_id',  // varchar
         'was_he_present',   // bool 0 or 1
     ];
+
+
+        /**
+     * The attributes that should be hidden for arrays.
+     *
+     * @var array
+     */
+    protected $hidden = [
+        'created_at', 'updated_at', 'deleted_at'
+    ];
 }

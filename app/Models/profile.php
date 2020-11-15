@@ -35,6 +35,16 @@ class profile extends Model
         'is_admin',
     ];
 
+
+        /**
+     * The attributes that should be hidden for arrays.
+     *
+     * @var array
+     */
+    protected $hidden = [
+        'created_at', 'updated_at', 'deleted_at'
+    ];
+
     public function role(){
     	return $this->hasOne(role::class, 'id','role');
     }

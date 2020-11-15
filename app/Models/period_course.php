@@ -23,4 +23,14 @@ class period_course extends Model
         'course_id',
         'scheduled_class_period'
     ];
+
+
+        /**
+     * The attributes that should be hidden for arrays.
+     *
+     * @var array
+     */
+    protected $hidden = [
+        'created_at', 'updated_at', 'deleted_at'
+    ];
 }

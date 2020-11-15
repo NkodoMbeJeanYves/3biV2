@@ -21,4 +21,13 @@ class payment extends Model
         'registration_id',
         'registration_type',
     ];
+
+        /**
+     * The attributes that should be hidden for arrays.
+     *
+     * @var array
+     */
+    protected $hidden = [
+        'created_at', 'updated_at', 'deleted_at'
+    ];
 }

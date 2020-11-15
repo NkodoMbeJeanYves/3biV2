@@ -25,7 +25,7 @@ class registration_channel extends registration
         'dateline'
     ];
 
-    protected $with = ['student', 'event', 'channel', 'paymentList'];
+    protected $with = ['student', 'classe', 'event' ,'paymentList'];//, ['event', 'channel', 'paymentList'];
 
     protected $withCount = ['paymentList'];
 
@@ -38,11 +38,15 @@ class registration_channel extends registration
     	return $this->belongsTo(event::class, 'event_id', 'event_id');
     }
 
-    public function channel(){
+    /*public function channel(){
     	return $this->belongsTo(channel::class, 'channel_id', 'channel_id');
-    }
+    }*/
 
     public function paymentList(){
     	return $this->hasMany(payment::class, 'registration_id', 'registration_id')->where('registration_type', 'channel');
+    }
+
+    public function classe(){
+        return $this->belongsTo(classe::class, 'channel_id', 'class_id');
     }
 }

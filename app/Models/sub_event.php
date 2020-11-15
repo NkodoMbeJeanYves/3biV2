@@ -27,6 +27,15 @@ class sub_event extends Model
         'sub_event_content',
     ];
 
+        /**
+     * The attributes that should be hidden for arrays.
+     *
+     * @var array
+     */
+    protected $hidden = [
+        'created_at', 'updated_at', 'deleted_at'
+    ];
+
     // set default value to false
     public function getCheckAttribute(){
         return false;

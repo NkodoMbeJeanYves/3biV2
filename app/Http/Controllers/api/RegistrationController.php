@@ -103,7 +103,7 @@ class RegistrationController extends Controller
                         ],
                         [
                             'event_id'      => $formData->event_id,
-                            'channel_id'    => $formData->channel_id,
+                            'class_id'    => $formData->class_id,
                             'dateline'      => Carbon::parse($formData->dateline),
                             'student_id'    => $formData->student_id,
                         ]);   

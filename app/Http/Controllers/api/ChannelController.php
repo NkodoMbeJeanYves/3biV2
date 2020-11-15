@@ -67,6 +67,7 @@ class ChannelController extends Controller
                         'channel_id'    =>  $channel_id,
                         'channel_content'      => $formData->channel_content,
                         'admission_amount' => $formData->admission_amount ?? 0,
+                        'school_id' => null
                     ]); 
         $channel->fill(['channel_id' => $channel_id]);            
                     

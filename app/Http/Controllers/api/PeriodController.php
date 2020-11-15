@@ -18,6 +18,7 @@ use App\Models\scheduled_class as scheduledClass;
 use App\Models\scheduled_class_period as scheduledClassPeriod;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
+use App\Services\PeriodService;
 
 class PeriodController extends Controller
 {
@@ -70,87 +71,16 @@ class PeriodController extends Controller
         return response()->json($results);              
     }
 
-    /**
-     * @comment load periods with all relationShip related with current school
-     */
-    public function loadSchoolPeriods(string $school_id){
-        $event = event::where('school_id', $school_id)->latest()->first();
-        
-        if(is_null($event)){
-            $data = [
-                        'periodGroupedByStartTime'   =>  [],
-                        'periodkeyById' =>  []
-                    ];
 
-            return response()->json($data); 
-        }
-
-        $results = [];
-/*        $periods = period::with([
-                                    'lecturers'    =>  function ($query) {
-                                                                        $query->where('period_lecturers.deleted_at', NULL);
-                                                                      },
-                                    'courses'      =>  function ($query) {
-                                                                        $query->where('period_courses.deleted_at', NULL);
-                                                                      },
-                                    'classrooms'   =>  function ($query) {
-                                                                        $query->where('period_classrooms.deleted_at', NULL);
-                                                                      },
-                                    'classes'      =>  function ($query) {
-                                                                        $query->where('period_class.deleted_at', NULL);
-                                                                      }
-                                ]*/
-        $periods = period::with(
-            [
-                'lecturers',
-                'courses',
-                'classrooms',
-                'classes'  
-            ])->where('school_id', $school_id)
-                ->where('event_id', $event->event_id)
-                ->orderBy('period_type')
-                ->orderBy('start_time')
-                ->orderBy('day')
-                ->get();
-
-        $start_times = period::where('school_id', $school_id)->distinct()->get('start_time');
-        
-        $r = []; $a =[];
-        foreach ($start_times as $key => $value) {
-            # code...
-            foreach ($periods as $key => $period) {
-                # code...
-                if ($period->start_time === $value->start_time)
-                    $r[$period->start_time][]  =   $period;
-            }
-
-        $a[$value->start_time] = collect($r[$value->start_time]);
-        }
-        ksort($a);
-        # array keyBy  
-        $res = $periods->keyBy('period_id')->transform(function ($item, $key) {
-                return $item;
-        });
-
-        $results = array_values($a);
-            $results = [
-                'periodGroupedByStartTime'   =>  $results,
-                'periodkeyById' =>  $res
-            ];
-        return $results;
-    }
-
-
-
-
-    
     /**
     *   Get class depending on provided school
     */
     public function getSchoolPeriods(string $school_id) 
     {
-        $results = $this->loadSchoolPeriods($school_id);
-        return response()->json($results['periodGroupedByStartTime']);
+        $PeriodService = new PeriodService;
+        $results = $PeriodService->loadGroupedSchoolPeriods($school_id);
+        $groupedPeriods = $results['periodGroupedByStartTime'];
+        return response()->json($groupedPeriods);
     }
 
 
@@ -469,18 +399,6 @@ class PeriodController extends Controller
                                                         ]);
                     });
 
-                    
-                    # check if record already exists
-                    /*$check = period_course::where('period_id', $period)->where('course_id', $formData->course_id)->first();
-                    if(is_null($check)){
-                        period_course::Insert(
-                        [
-                            'period_id'      =>  $period,
-                            'course_id'      =>  $formData->course_id
-                        ]);
-                    }*/
-                                                   
-                
             }
 
         }

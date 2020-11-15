@@ -13,10 +13,17 @@ use App\Models\event_sub_event;
 use Validator;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use App\Services\PeriodService;
 
 
 class EventController extends Controller
 {
+
+    private $_periodService = null;
+
+    public function __construct() {
+        $this->_periodService = new PeriodService;
+    }
 
 
     /**
@@ -39,115 +46,6 @@ class EventController extends Controller
     }
 
 
-    /**
-    *@comment determiner le nombre de periodes elementaires entre l'heure de debut 
-    * et l'heure de fin des cours de l'ecole du model.
-    */
-    function findMultiplicateur(School $model){
-/*      $start_time = \Carbon\Carbon::createFromFormat('hh:mm:ss',$model->class_start_time);
-        $end_time = \Carbon\Carbon::createFromFormat('hh:mm:ss',$model->class_end_time);*/
-        $start_time = new Carbon($model->class_start_time);
-        $end_time = new Carbon($model->class_end_time);
-        $duration = $model->class_duration;
-        $delay = $start_time->diffInMinutes($end_time);
-        $multi =  intdiv($delay, $duration);
-        return $multi;
-    }
-
-
-    /**
-    * @Comment Create period related to last event
-    */
-    public function createPeriodsForThatModel(School $school, string $school_id, string $event_id){
-        $days = day::all();
-        $periods = [];
-
-        $multi = $this->findMultiplicateur($school) + 1; 
-
-           // elaboration des periodes
-           // days loop
-           for ($index = 0; $index  < count($days) ; $index++) { 
-            # code...
-            $ref_end_time = null;
-                for ($i=1; $i <= $multi ; $i++) { 
-                    # code...
-                    $period_start_time_in_minutes = ($school->class_duration)*($i-1);
-                    $period_end_time_in_minutes = ($school->class_duration)*$i;
-                    $period_start_time = $ref_end_time ?? (new Carbon($school->class_start_time))->addMinutes($period_start_time_in_minutes);
-                    $period_end_time = $ref_end_time ? (new Carbon($ref_end_time))->addMinutes($school->class_duration): (new Carbon($school->class_start_time))->addMinutes($period_end_time_in_minutes);
-
-                    $flag = false;
-                    # check if $period_end_time equal to any break start time then create that break period
-                    if ($period_start_time->eq(new Carbon($school->first_break_start_time))) {
-                        $flag = true;
-                        $periods[]  =   [
-                            'period_id' =>  'per'.$this->generate_Id(period::class),
-                            'day'       =>  $days[$index]->day_id,
-                            'start_time'=>  new Carbon($school->first_break_start_time),
-                            'end_time'  =>  (new Carbon($school->first_break_start_time))->addMinutes($school->first_break_duration),
-                            'period_type'=> 'break',
-                            'event_id'  =>  $event_id,
-                            'school_id'  => $school_id
-                        ];  
-                        $ref_end_time = (new Carbon($school->first_break_start_time))->addMinutes($school->first_break_duration);
-                    }
-
-                    if ($school->second_break_duration){
-                        if ($period_start_time->eq(new Carbon($school->second_break_start_time))) {
-                            $flag = true;
-                            $periods[]  =   [
-                                'period_id' =>  'per'.$this->generate_Id(period::class),
-                                'day'       =>  $days[$index]->day_id,
-                                'start_time'=>  new Carbon($school->second_break_start_time),
-                                'end_time'  =>  (new Carbon($school->second_break_start_time))->addMinutes($school->second_break_duration),
-                                'period_type'=> 'break',
-                                'event_id'  =>  $event_id,
-                                'school_id'  => $school_id
-                            ];  
-                            $ref_end_time = (new Carbon($school->second_break_start_time))->addMinutes($school->second_break_duration);
-                        }
-                    }
-                    
-                    if ($school->third_break_duration){
-                        if ($period_start_time->eq(new Carbon($school->third_break_start_time))) {
-                            $flag = true;
-                            $periods[]  =   [
-                                'period_id' =>  'per'.$this->generate_Id(period::class),
-                                'day'       =>  $days[$index]->day_id,
-                                'start_time'=>  new Carbon($school->third_break_start_time),
-                                'end_time'  =>  (new Carbon($school->third_break_start_time))->addMinutes($school->third_break_duration),
-                                'period_type'=> 'break',
-                                'event_id'  =>  $event_id,
-                                'school_id'  => $school_id
-                            ];  
-                            $ref_end_time = (new Carbon($school->third_break_start_time))->addMinutes($school->third_break_duration);
-                        }
-                    }
-                    
-                    if (!$flag){
-                        $periods[]  =   [
-                            'period_id' =>  'per'.$this->generate_Id(period::class),
-                            'day'       =>  $days[$index]->day_id,
-                            'start_time'=>  $period_start_time,
-                            'end_time'  =>  $period_end_time,
-                            'period_type'=> 'class',
-                            'event_id'  =>  $event_id,
-                            'school_id'  => $school_id
-                        ]; 
-                        $ref_end_time = $period_end_time;
-                    }
-                        
-                    
-
-                     
-                }
-            }
-        
-
-        period::insert($periods);   // persisted
-        return $periods;
-        
-    }
 
 
     /**
@@ -236,8 +134,7 @@ class EventController extends Controller
             $sub_events = sub_event::all();
             $event->sub_events()->attach($sub_events->pluck('sub_event_id')); 
 
-            
-            $this->createPeriodsForThatModel($school, $school_id, $event_id);
+            $this->_periodService->createPeriodsForThatModel($school, $school_id, $event_id);
 
         });
         

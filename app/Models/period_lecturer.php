@@ -22,4 +22,14 @@ class period_lecturer extends Model
         'lecturer_id'
     ];
 
+
+        /**
+     * The attributes that should be hidden for arrays.
+     *
+     * @var array
+     */
+    protected $hidden = [
+        'created_at', 'updated_at', 'deleted_at'
+    ];
+
 }

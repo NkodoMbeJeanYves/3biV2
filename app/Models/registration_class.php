@@ -26,7 +26,7 @@ class registration_class extends registration
         'dateline'
     ];
 
-    protected $with = ['student', 'event', 'classe', 'paymentList'];
+    protected $with = ['student', 'classe', 'event', 'paymentList']; //, 'event', 'classe', 'paymentList'];
 
     protected $withCount = ['paymentList'];
 

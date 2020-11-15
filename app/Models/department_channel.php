@@ -28,6 +28,8 @@ class department_channel extends Model
         'channel_id',
     ];
 
+    
+
     /* public function sub_events(){
         return $this->belongsToMany(sub_event::class,'event_sub_events','event_id','sub_event_id')
         ->as('related_sub_events');

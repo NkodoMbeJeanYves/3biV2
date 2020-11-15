@@ -26,7 +26,7 @@ class school extends Model
 
     protected $table = "schools";
     protected $primaryKey = "school_id";
-    protected $appends = ['test', 'LastEvent']; 
+    protected $appends = ['LastEvent']; 
 
     protected $fillable = [
         'school_id',
@@ -45,9 +45,20 @@ class school extends Model
         'third_break_start_time',
     ];
 
+
+        /**
+     * The attributes that should be hidden for arrays.
+     *
+     * @var array
+     */
+    protected $hidden = [
+        'created_at', 'updated_at', 'deleted_at'
+    ];
+
+
     # Sometimes you might want to always load some relationships when retrieving a model. 
     # To accomplish this, you may define a $with property on the model:
-    protected $with = ['periods', 'buildings', 'classes', 'classrooms', 'profiles', 'courses'];
+    protected $with = ['buildings', 'classes', 'classrooms', 'profiles', 'courses'];
 
     # Sometimes you might want to always load some countable relationships when retrieving a model. 
     protected $withCount = ['periods', 'buildings', 'classes', 'classrooms', 'profiles', 'courses'];

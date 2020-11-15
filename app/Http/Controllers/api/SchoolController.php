@@ -9,6 +9,7 @@ use App\Models\building;
 use App\Models\classe;
 use App\Models\classroom;
 use App\Models\registration_class;
+use App\Models\registration_channel;
 use App\Models\channel;
 use App\Models\day;
 use App\Models\event;
@@ -17,11 +18,12 @@ use App\Models\course;
 use Illuminate\Http\Request;
 use Validator;
 use Carbon\Carbon;
+use App\Services\PeriodService;
 
 
 class SchoolController extends Controller
 {
-
+    private $_periodService = null;
 
     /**
      * Create a new AuthController instance.
@@ -31,71 +33,28 @@ class SchoolController extends Controller
     public function __construct()
     {
         // $this->middleware('auth:api', ['except' => ['login']]);
+        $this->_periodService = new PeriodService;
     }
 
+    
     /**
-     * @comment load periods with all relationShip related with current school and last event
+     * @comment load periods with all relationShip related with current school
      */
     public function loadSchoolPeriods(string $school_id){
-        $results = [];
-/*        $periods = period::with([
-                                    'lecturers'    =>  function ($query) {
-                                                                        $query->where('period_lecturers.deleted_at', NULL);
-                                                                      },
-                                    'courses'      =>  function ($query) {
-                                                                        $query->where('period_courses.deleted_at', NULL);
-                                                                      },
-                                    'classrooms'   =>  function ($query) {
-                                                                        $query->where('period_classrooms.deleted_at', NULL);
-                                                                      },
-                                    'classes'      =>  function ($query) {
-                                                                        $query->where('period_class.deleted_at', NULL);
-                                                                      }
-                                ]*/
-        // Last Event
-        $event = event::where('school_id', $school_id)->latest()->first();
-        
-        if(is_null($event)){
-            return []; 
-        }
-
-        $periods = period::with(
-            [
-                'lecturers',
-                'courses',
-                'classrooms',
-                'classes'  
-            ])->where('school_id', $school_id)->orderBy('period_type')->orderBy('start_time')->orderBy('day')->get();
-        $start_times = period::where('school_id', $school_id)
-                        ->where('event_id', $event->event_id)
-                        ->distinct()
-                        ->get('start_time');
-        
-        $r = []; $a =[];
-        foreach ($start_times as $key => $value) {
-            # code...
-            foreach ($periods as $key => $period) {
-                # code...
-                if ($period->start_time === $value->start_time)
-                    $r[$period->start_time][]  =   $period;
-            }
-
-        $a[$value->start_time] = collect($r[$value->start_time]);
-        }
-        ksort($a);
-        $results = array_values($a);
-        return $results;
+        $results = $this->_periodService->loadGroupedSchoolPeriods($school_id);
+        return $results['periodGroupedByStartTime'];
     }
+
+
+
 
     /**
      * @Comment fetch all resources
      */
-    public function all(){
+    public function all() {
         // retrieve involved model
         $schools = school::oldest()->get();
         $sub_events = sub_event::all();
-        $channels = channel::all();
-        $registrations = registration_class::query();
 
         foreach ($schools as $school) {
             # code...
@@ -107,17 +66,34 @@ class SchoolController extends Controller
             $school->periods = $this->loadSchoolPeriods($school->school_id);
             $school->ValidPeriod = $this->checkIfPeriodisInAccordWithProvidedClassDuration($school);
             $school->sub_events = $sub_events;
-            if( $school->school_type == 'UNIVERSITY'){
-                $school->channels = $channels;
-                $school->channel_count = count($channels);
-            }else{
+
+            // $registrations = null;
+            if ( $school->school_type == 'UNIVERSITY') {
+
+                $registrations = registration_channel::query();
+                #
                 # fetch remaining seat to each class
+                foreach ($school->classes as $classe) {
                 $school_registration_class = $registrations;
-                foreach($school->classes as $classe){
+
+                    $school_registration_class->where('event_id', $lastEvent_id)->where('channel_id', $classe->class_id);
+                    $classe->current_seat = $school_registration_class->count();
+                }
+
+            } else {
+                $registrations = registration_class::query();
+                #
+                # fetch remaining seat to each class
+                foreach ($school->classes as $classe) {
+                $school_registration_class = $registrations;
+
                     $school_registration_class->where('event_id', $lastEvent_id)->where('class_id', $classe->class_id);
                     $classe->current_seat = $school_registration_class->count();
                 }
             }
+
+                
+            //}
             
         }
 
@@ -331,25 +307,35 @@ class SchoolController extends Controller
                         ->orwhere('description','like','%'.$param.'%')
                         ->first();
         $sub_events = sub_event::all();
-        $channels = channel::all();
-        $registrations = registration_class::query();
 
         # code...
         # fetch school lastEvent in date
-        //$school->LastEvent = $school->lastEvent();
-
         $lastEvent_id = $school->LastEvent != null ? $school->LastEvent->event_id : NUll;
 
         $school->periods = $this->loadSchoolPeriods($school->school_id);
         $school->ValidPeriod = $this->checkIfPeriodisInAccordWithProvidedClassDuration($school);
         $school->sub_events = $sub_events;
-        if( $school->school_type == 'UNIVERSITY'){
-            $school->channels = $channels;
-            $school->channel_count = count($channels);
-        } else {
+
+
+        if ( $school->school_type == 'UNIVERSITY') {
+
+            $registrations = registration_channel::query();
+            #
             # fetch remaining seat to each class
+            foreach ($school->classes as $classe) {
             $school_registration_class = $registrations;
-            foreach($school->classes as $classe){
+
+                $school_registration_class->where('event_id', $lastEvent_id)->where('channel_id', $classe->class_id);
+                $classe->current_seat = $school_registration_class->count();
+            }
+
+        } else {
+            $registrations = registration_class::query();
+            #
+            # fetch remaining seat to each class
+            foreach ($school->classes as $classe) {
+            $school_registration_class = $registrations;
+
                 $school_registration_class->where('event_id', $lastEvent_id)->where('class_id', $classe->class_id);
                 $classe->current_seat = $school_registration_class->count();
             }

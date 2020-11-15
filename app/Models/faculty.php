@@ -27,6 +27,15 @@ class faculty extends Model
         'faculty_name',
     ];
 
+        /**
+     * The attributes that should be hidden for arrays.
+     *
+     * @var array
+     */
+    protected $hidden = [
+        'created_at', 'updated_at', 'deleted_at'
+    ];
+
     public function departments(){
         return $this->hasMany(department::class,'faculty_id','dapartment_id')
         ->as('faculty_departments');

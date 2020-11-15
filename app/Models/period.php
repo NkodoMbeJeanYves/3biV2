@@ -33,6 +33,16 @@ class period extends Model
         'school_id'
     ];
 
+
+        /**
+     * The attributes that should be hidden for arrays.
+     *
+     * @var array
+     */
+    protected $hidden = [
+        'created_at', 'updated_at', 'deleted_at'
+    ];
+
     public function lecturers(){
         return $this->belongsToMany(profile::class,'period_lecturers','period_id','lecturer_id')
         ->as('period_lecturers');

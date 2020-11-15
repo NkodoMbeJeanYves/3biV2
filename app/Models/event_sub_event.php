@@ -16,4 +16,13 @@ class event_sub_event extends Model
         'is_checked',
         'registration_fee'
     ];
+
+        /**
+     * The attributes that should be hidden for arrays.
+     *
+     * @var array
+     */
+    protected $hidden = [
+        'created_at', 'updated_at', 'deleted_at'
+    ];
 }

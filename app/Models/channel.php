@@ -28,6 +28,15 @@ class channel extends Model
         'admission_amount'
     ];
 
+        /**
+     * The attributes that should be hidden for arrays.
+     *
+     * @var array
+     */
+    protected $hidden = [
+        'created_at', 'updated_at', 'deleted_at'
+    ];
+
     /* public function sub_events(){
         return $this->belongsToMany(sub_event::class,'event_sub_events','event_id','sub_event_id')
         ->as('related_sub_events');

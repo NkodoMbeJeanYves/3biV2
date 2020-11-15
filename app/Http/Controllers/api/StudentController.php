@@ -78,20 +78,29 @@ class StudentController extends Controller
     }
 
 
-    public function enroll($formData, $student, $data){
+    /**
+     *  @param $formData    Posted Data
+     *  @param $student (filled student model)
+     *  @param $data custom data related to student password and other
+     *  @param $model class_id | channel_id
+     *
+     **/
+    public function enroll($formData, $student, $data, $model = null){
 
         $registration = new registration();
-        # passage ^par reférence car on veut extraire le contenu de $registration à la sortie
+        # passage par reférence car on veut extraire le contenu de $registration à la sortie
         DB::transaction(function () use ($formData, $student, $data, &$registration){
             $student->fill([
+                // save student and retrieve its id
                 'user_id' => $this->getStudentUserId($data),
             ]);   
             $student_id = $student->student_id;
 
             $student->save();
+ 
 
-            switch ($formData->class_id) {
-                case null:
+            switch (!isset($formData->class_id)) {
+                case true:
                     # code...
                     # use registration_channel
                     $registration = registration_channel::updateOrCreate(
@@ -126,12 +135,9 @@ class StudentController extends Controller
                     break;
             }
 
-        });/*
-   
-            file_put_contents('pwd.txt', $registration);
-                  dd('yoo');*/
-        return $registration;
+        });
 
+        return $registration;
     }
 
     /**
@@ -152,6 +158,7 @@ class StudentController extends Controller
             $formData = $request;
         }
         $messages = [];
+    
 
         $validator = Validator::make($formDataToCheck, [
                                                 'fullname'  =>  'bail|required|string|max:150',
@@ -175,7 +182,8 @@ class StudentController extends Controller
             }
 
         # check if there are remaining seat within the class
-        if(!is_null($formData->registration->class_id)){
+        # only check remaining seat at college or high school but not at university        
+        if(isset($formData->registration->class_id)){
             if ($this->howManySeatdoesitRemainInClass($formData->registration->event_id, $formData->registration->class_id) == 0 ){
                 return response()->json(['errors'=> 'There is no more place in this class', 'status'=> 201]);
             }
@@ -212,13 +220,12 @@ class StudentController extends Controller
             'serial'     => $serial
         ]);
         $data['serial'] = $serial;
-        /*$student->fill([
-            'user_id' => $this->getStudentUserId($data),
-        ]);   */  
-        // $student->save();   // persisted 
         
+
         // after student went persisted, create its registration
         # We need event_id, Class or Channel_id, dateline and student_id
+        # define model member to access registration
+        // $model = (isset($formData->registration->class_id)) ? 'class_id' : 'channel_id';    
         $registration = $this->enroll($formData->registration, $student, $data);
         return response()->json(['data' => $registration, 'status' => 200]);
     }
@@ -263,7 +270,7 @@ class StudentController extends Controller
     *
     */
     public function generateRandomString($length = 5){
-        $characters = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ@_';
+        $characters = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_';
         $charactersLength = strlen($characters);
         $randomString = '';
         for ($i = 0; $i < $length; $i++) {
@@ -358,6 +365,8 @@ class StudentController extends Controller
      */
     public function destroy(student $student)
     {
+        return response()->json(['data'=> 'Not yet implemented!', 'status' => 200]);
+        
         $student->delete();
         return response()->json(['data'=> $student->student_id, 'status' => 200]);
     }

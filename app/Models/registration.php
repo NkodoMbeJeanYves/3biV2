@@ -11,6 +11,15 @@ use App\Models\payment;
 
 class registration extends Model
 {
+
+        /**
+     * The attributes that should be hidden for arrays.
+     *
+     * @var array
+     */
+    protected $hidden = [
+        'created_at', 'updated_at', 'deleted_at'
+    ];
     /*use SoftDeletes;
     public $timestamps = true;
     protected $table = "registrations_channel";
