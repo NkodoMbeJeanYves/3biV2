@@ -8,6 +8,8 @@ use Dotenv;
 use InvalidArgumentException;*/
 use Illuminate\Database\Connection;
 
+# Self defense
+// Route::get('/wipe', 'api\TestController@index');
 
 Route::group([
 
@@ -32,20 +34,20 @@ Route::group([
     ovh pass ovh = Ahrecccomupassword2020
 });*/
 
-
-
-# Protected Routes
-Route::group(['middleware'=>'auth:api'], function(){
-	# School Route
-	Route::group(['prefix'	=>	'school'], function(){
+Route::group(['prefix'	=>	'school'], function(){
 	Route::get('/','api\SchoolController@all');
 	Route::post('/','api\SchoolController@store');
 	Route::put('/{id}','api\SchoolController@update');
 	Route::patch('/{id}','api\SchoolController@update');
 	Route::get('/{id}','api\SchoolController@find');
-	Route::delete('/{id}','api\SchoolController@delete');	
+	Route::delete('/{id}','api\SchoolController@delete');
 	
 	});
+
+# Protected Routes
+//Route::group(['middleware'=>'auth:api'], function(){
+	# School Route
+	
 
 	# Building Route
 	Route::apiResource('building','api\BuildingController');
@@ -105,7 +107,7 @@ Route::group(['middleware'=>'auth:api'], function(){
 	Route::apiResource('payment','api\PaymentController');
 
 
-});
+//});
 
 # Main upload route
 Route::post('/upload', 'Controller@fileUpload');
@@ -113,8 +115,37 @@ Route::post('/upload', 'Controller@fileUpload');
 # Current test Route
 Route::get('attendance/{school_id}', 'api\AttendanceController@getRegisteredStudents');
 
+// store lecturer attendance
+Route::post('attendance', 'api\AttendanceController@store');
+// store student attendance
+Route::post('attendance/students/v1', 'api\AttendanceController@storeLearnerAttendance');
+
+// fetch teaching reference number
+Route::get('attendance/fetch_school_teaching_ref_number/{school_id}','api\AttendanceController@fetchTeachingReferenceNumber');
+
+// load student list relate to teaching id
+Route::post('attendance/students','api\AttendanceController@getStudentsRegardingTeachingReferenceNumber');
+
+
+/*
+	Route::get('last', function(){
+		$dt = Carbon\Carbon::now('Africa/Douala'); 
+
+		$dt = new Carbon\Carbon();
+		$first = $dt->addDay();
+		$last = $dt->subDays(5);
+	       
+	        return response()->json((object) [
+	                'first_day' => $first,
+	                'last_day'  => $last
+	        ]);
+	});
+*/
+
+
+
 // Caution : Do not apply it anymore Restructure database
-Route::get('fork', 'api\PeriodController@fork');
+// Route::get('fork', 'api\PeriodController@fork');
 
 
 
