@@ -40,7 +40,8 @@ class SchoolController extends Controller
     /**
      * @comment load periods with all relationShip related with current school
      */
-    public function loadSchoolPeriods(string $school_id){
+    public function loadSchoolPeriods(string $school_id) 
+    {
         $results = $this->_periodService->loadGroupedSchoolPeriods($school_id);
         return $results['periodGroupedByStartTime'];
     }
@@ -74,7 +75,7 @@ class SchoolController extends Controller
                 #
                 # fetch remaining seat to each class
                 foreach ($school->classes as $classe) {
-                $school_registration_class = $registrations;
+                    $school_registration_class = $registrations;
 
                     $school_registration_class->where('event_id', $lastEvent_id)->where('channel_id', $classe->class_id);
                     $classe->current_seat = $school_registration_class->count();

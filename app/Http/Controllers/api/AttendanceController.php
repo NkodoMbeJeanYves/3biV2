@@ -190,7 +190,7 @@ class AttendanceController extends Controller
         $conditions = $this->findInvolvedConditionV2($teachings); 
         $normalPeriodTimes = ($this->periodService)->getPeriodDelayByTeachingIdNormalTime($teachings, $this->school_id);
         $extraPeriodTimes = ($this->periodService)->getPeriodDelayByTeachingIdExtraTime($teachings, $this->school_id);
-
+       
         # we need to append required conditions
         foreach ($conditions as $key => $condition) {
  
@@ -201,18 +201,19 @@ class AttendanceController extends Controller
             // check if it is null
             // teaching_id should be related with extra_time or normal_time but not both
             if (!is_null($normalPeriodTimes)) {
-                if(array_key_exists($condition->teaching_id, $normalPeriodTimes)) {
+                if (array_key_exists($condition->teaching_id, $normalPeriodTimes)) {
                     $condition->startAndEndTimeRegardingTeaching = $normalPeriodTimes[$condition->teaching_id];
                 }
             }
 
             if (!is_null($extraPeriodTimes)) {
-                if(array_key_exists($condition->teaching_id, $extraPeriodTimes)) {
+                if (array_key_exists($condition->teaching_id, $extraPeriodTimes)) {
                     $condition->startAndEndTimeRegardingTeaching = $extraPeriodTimes[$condition->teaching_id];
                 }
             }
 
         }    
+        dd($extraPeriodTimes, $normalPeriodTimes);
         // sort by teaching_id
         $collections = collect($conditions)->sortByDesc('teaching_id');
 
@@ -318,9 +319,6 @@ class AttendanceController extends Controller
 
         // $condition = $this->buildConditionsForTeachingIdNumbers([$formData->teaching_id]);
 
-
-        $teaching = teaching::firstOrNew(['teaching_id' => $formData->teaching_id]);
-        
         $school = school::find($formData->school_id);
 
         $currentEvent = $formData->event_id;
@@ -340,15 +338,19 @@ class AttendanceController extends Controller
             return $item->student_id;
         });
         # retrieve all registered students informations
-        $students = $registrations->keyBy('student_id')->transform(function ($item, $key) {
+        $students = $registrations->transform(function ($item, $key) {
             return $item->student;
         });
 
         # eager loading students with attendance
         if ($school->school_type == 'UNIVERSITY') {
-            $teachered = teachered_channel::whereIn('student_id', $students_id)->get();
+            $teachered = teachered_channel::whereIn('student_id', $students_id)
+                                            ->where('teaching_id', $formData->teaching_id)
+                                            ->get();
         } else {
-            $teachered = teachered_class::whereIn('student_id', $students_id)->get();
+            $teachered = teachered_class::whereIn('student_id', $students_id)
+                                            ->where('teaching_id', $formData->teaching_id)
+                                            ->get();
         }
 
         foreach ($teachered as $key => $line) {
@@ -356,7 +358,7 @@ class AttendanceController extends Controller
             ($students[$line->student_id])->flag = $line->was_he_present;
         }
 
-        return response()->json(['data' => $students, 'status' => 200]);
+        return response()->json($students, 200);
     }
 
 

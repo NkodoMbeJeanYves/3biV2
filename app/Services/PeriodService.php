@@ -201,7 +201,7 @@ class PeriodService {
     /**
      *  @comment retrieve dalay of period regarding teaching_id Extra tme
      */
-    function getPeriodDelayByTeachingIdExtraTime(Array $teaching_ids, $school_id) {
+    function getPeriodDelayByTeachingIdExtraTime(Array $teaching_ids, $school_id): Array {
 
         $results = DB::table('extra_times')->whereIn('teaching_id', $teaching_ids)
                                                 ->join('periods','extra_times.period_id','periods.period_id')
@@ -229,19 +229,19 @@ class PeriodService {
                     $flag = true;
                 }
             }
-            if($flag == true) {
+            if ($flag == true) {
                 $aux->subject = $line->subject;
                 $params[$teaching['teaching_id']] = $aux;
             }
         }                                       
-        return $params;
+        return is_null($params) ? []: $params;       
     }
 
 
     /**
      *  @comment retrieve dalay of period regarding teaching_id normal time
      */
-    function getPeriodDelayByTeachingIdNormalTime(Array $teaching_ids, $school_id) {
+    function getPeriodDelayByTeachingIdNormalTime(Array $teaching_ids, $school_id): Array {
         $results = DB::table('normal_times')->whereIn('teaching_id', $teaching_ids)
                                             ->join('scheduled_class_periods','scheduled_class_periods.scheduled_class_period_id','normal_times.scheduled_class_period_id')
                                             ->join('scheduled_class','scheduled_class_periods.scheduled_class_id','scheduled_class.scheduled_class_id')
@@ -271,11 +271,11 @@ class PeriodService {
                 }
 
             }
-            if($flag == true) {
+            if ($flag == true) {
                 $aux->subject = $line->subject;
                 $params[$teaching['teaching_id']] = $aux;
             }
         }     
-        return $params;       
+        return is_null($params) ? []: $params;       
     }
 }
