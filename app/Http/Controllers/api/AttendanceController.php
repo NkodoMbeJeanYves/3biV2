@@ -200,20 +200,19 @@ class AttendanceController extends Controller
             $condition->field = $this->classesList[$condition->class_id];
             // check if it is null
             // teaching_id should be related with extra_time or normal_time but not both
-            if (!is_null($normalPeriodTimes)) {
+            if (count($normalPeriodTimes) != 0 ) {
                 if (array_key_exists($condition->teaching_id, $normalPeriodTimes)) {
                     $condition->startAndEndTimeRegardingTeaching = $normalPeriodTimes[$condition->teaching_id];
                 }
             }
 
-            if (!is_null($extraPeriodTimes)) {
+            if (count($extraPeriodTimes) != 0) {
                 if (array_key_exists($condition->teaching_id, $extraPeriodTimes)) {
                     $condition->startAndEndTimeRegardingTeaching = $extraPeriodTimes[$condition->teaching_id];
                 }
             }
 
         }    
-        dd($extraPeriodTimes, $normalPeriodTimes);
         // sort by teaching_id
         $collections = collect($conditions)->sortByDesc('teaching_id');
 
@@ -306,25 +305,23 @@ class AttendanceController extends Controller
 
         $formDataToCheck = json_decode(file_get_contents("php://input"), TRUE);
         $formData = json_decode(file_get_contents("php://input"));
-            
-        if(is_null($formDataToCheck)) {
+             
+        if (is_null($formDataToCheck)) {
             $formDataToCheck = $request->all();
             $formData = $request;
         }
+
         // We need to retrieve some dummy informations like classroom_name, class_name, lecturer_name
         // regarding teachingId
         // We dont need to send that to front-end user
         // fetch class | classrooms | profile
-        //$this->loadParameters($formData->school_id);
-
-        // $condition = $this->buildConditionsForTeachingIdNumbers([$formData->teaching_id]);
 
         $school = school::find($formData->school_id);
 
         $currentEvent = $formData->event_id;
         // retrieve involved class or field
         $involvedClassOrField = $this->findClassOrFieldRegardingTeaching($formData->teaching_id);
-
+        
         $registrations = $school->school_type == 'UNIVERSITY' ? 
                 registration_channel::where('event_id', $currentEvent)
                                       ->where('channel_id', $involvedClassOrField)
@@ -332,33 +329,56 @@ class AttendanceController extends Controller
                 registration_class::where('event_id', $currentEvent)
                                     ->where('class_id', $involvedClassOrField)
                                     ->get();
-
+            
         # retrieve all students id regarding registration
-        $students_id = $registrations->keyBy('registration_id')->transform(function ($item, $key) {
-            return $item->student_id;
-        });
-        # retrieve all registered students informations
-        $students = $registrations->transform(function ($item, $key) {
-            return $item->student;
-        });
+        $s = [];
+        /* $students = $registrations->map(
+            function ($item, $key) {
+                return $item->student;
+        }); */
+        $students = [];
+        foreach ($registrations as $key => $registration) {
+            array_push($students, $registration->student);
+        }
 
+
+        foreach ($students as $key => $student) {
+            array_push($s, $student);
+        }
+        
+        $students_id = [];
+        foreach ($students as $key => $student) {
+            array_push($students_id, $student->student_id);
+        }
+
+        $replacements = [];
+        foreach ($students as $student) {
+            array_push($replacements, $student);
+        }
+        $students = $replacements;
         # eager loading students with attendance
         if ($school->school_type == 'UNIVERSITY') {
             $teachered = teachered_channel::whereIn('student_id', $students_id)
-                                            ->where('teaching_id', $formData->teaching_id)
-                                            ->get();
+                ->where('teaching_id', $formData->teaching_id)
+                ->get();
+
         } else {
             $teachered = teachered_class::whereIn('student_id', $students_id)
-                                            ->where('teaching_id', $formData->teaching_id)
-                                            ->get();
+                ->where('teaching_id', $formData->teaching_id)
+                ->get();
         }
 
         foreach ($teachered as $key => $line) {
-            
-            ($students[$line->student_id])->flag = $line->was_he_present;
+            foreach ($students as $key => $student) {
+                # code...
+                if ($student->student_id == $line->student_id) {
+                    $student->flag = $line->was_he_present;
+                }
+
+            }
         }
 
-        return response()->json($students, 200);
+        return response()->json($students);
     }
 
 
@@ -398,34 +418,6 @@ class AttendanceController extends Controller
             $formDataToCheck = $request->all();
             $formData = $request;
         }
-
-        $teaching = null;
-
-
-        /*if (!is_null($formData->teaching_id)) {
-
-            // delete teaching before processing due to a future update process
-            $teaching = teaching::find($formData->teaching_id);
-            if (!is_null($teaching)) {
-                $teaching->delete();
-            }
-            // then create new one
-            // creating teaching 
-            $teaching = teaching::create([
-                'event_id'  => $formData->event_id,
-                'class_date'=> Carbon::parse($formData->class_date)
-            ]);
-
-        } else {
-            // creating teaching 
-            $teaching = teaching::create([
-                'event_id'  => $formData->event_id,
-                'class_date'=> Carbon::parse($formData->class_date)
-            ]);
-
-        }*/
-
-
     	# scheduled_class
         // verifier si l'ensemble des 4 elements est dans scheduled_class
         
@@ -599,34 +591,19 @@ class AttendanceController extends Controller
         $formDataToCheck = json_decode(file_get_contents("php://input"), TRUE);
         $formData = json_decode(file_get_contents("php://input"));
             
-        if(is_null($formDataToCheck)) {
+        if (is_null($formDataToCheck)) {
             $formDataToCheck = $request->all();
             $formData = $request;
         }
 
-        # retrieve involvedClassOrField regarding teaching_id
-        $involvedClassOrField = $this->findClassOrFieldRegardingTeaching($formData->teaching_id);
-
-        $flag_classOrChannel = classe::find($involvedClassOrField);
-        $model = null;
+        $school = school::find($formData->school_id);
  
 
-        if (!is_null($flag_classOrChannel)) {
-            $modelName =  'teachered_class'::class;
-            $model = 1;//app($modelName);
-        } 
-
-        $flag_classOrChannel = channel::find($involvedClassOrField);
-
-        if (!is_null($flag_classOrChannel)) {
-            $modelName =  'teachered_channel'::class;
-            $model = 1;//app($modelName);
-        }
-
-        if (is_null($model)) {
-            return response()->json('Nothing to tick', 201);
+        if ($school->school_type == 'UNIVERSITY') {
+            $modelName =  'teachered_channel';
         } else {
-
+            $modelName =  'teachered_class';
+        }
             # save attendance of students
             $attendances = [];
             foreach ($formData->students as $key => $student_id) {
@@ -635,15 +612,11 @@ class AttendanceController extends Controller
                                     'student_id'        =>  $student_id
                                 ];
             }
-
             // before insert data, wipe all data relate to teaching_id first
             //$wipe = $model::where('teaching_id', $formData->teaching_id)->delete();
-            $wipe = DB::table($modelName)->where('teaching_id', $formData->teaching_id)->delete();
+            DB::table($modelName)->where('teaching_id', $formData->teaching_id)->delete();
             $data = DB::table($modelName)->insert($attendances);
-            //$data = $model::insert($attendances);
-
-        }
-
+            
         return response()->json(['data' => $data,'status' => 200]);
     }
 }

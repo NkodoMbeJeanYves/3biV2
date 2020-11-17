@@ -34,15 +34,17 @@ Route::group([
     ovh pass ovh = Ahrecccomupassword2020
 });*/
 
-Route::group(['prefix'	=>	'school'], function(){
-	Route::get('/','api\SchoolController@all');
-	Route::post('/','api\SchoolController@store');
-	Route::put('/{id}','api\SchoolController@update');
-	Route::patch('/{id}','api\SchoolController@update');
-	Route::get('/{id}','api\SchoolController@find');
-	Route::delete('/{id}','api\SchoolController@delete');
-	
-	});
+Route::group(
+    ['prefix' => 'school'], function (){
+        Route::get('/', 'api\SchoolController@all');
+		Route::post('/', 'api\SchoolController@store');
+		Route::put('/{id}', 'api\SchoolController@update');
+		Route::patch('/{id}', 'api\SchoolController@update');
+		Route::get('/{id}', 'api\SchoolController@find');
+		Route::delete('/{id}', 'api\SchoolController@delete');
+
+}
+);
 
 # Protected Routes
 //Route::group(['middleware'=>'auth:api'], function(){

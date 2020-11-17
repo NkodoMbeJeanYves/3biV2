@@ -208,22 +208,23 @@ class PeriodService {
                                                 ->join('scheduled_class_periods','scheduled_class_periods.period_id','periods.period_id')
                                                 ->join('scheduled_class','scheduled_class_periods.scheduled_class_id','scheduled_class.scheduled_class_id')
                                                 ->join('courses','courses.course_id','scheduled_class.course_id')
-                                               ->where('periods.school_id', $school_id)
-                                               ->select('periods.*','teaching_id', 'course_name as subject')
-                                               ->orderBy('teaching_id', 'DESC')
-                                               ->orderBy('periods.start_time', 'DESC')
-                                               ->get();
-        
-        $params = Null;
-        foreach ($teaching_ids as $key => $teaching) {
+                                                ->where('periods.school_id', $school_id)
+                                                ->select('periods.*','teaching_id', 'course_name as subject')
+                                                ->orderBy('teaching_id', 'DESC')
+                                                ->orderBy('periods.start_time', 'DESC')
+                                                ->get();
+
+                                               
+        $params = []; 
+        foreach ($teaching_ids as $key => $teaching_id) {
             $aux = new stdClass;            
             $aux->start_time = '23:59:59';
             $aux->end_time = '00:00:00';                        
-            $aux->teaching_id = $teaching['teaching_id'];
+            $aux->teaching_id = $teaching_id;
             $flag = false;
             // 
             foreach ($results as $key => $line) {
-                if ($line->teaching_id == $teaching['teaching_id']) {
+                if ($line->teaching_id == $teaching_id) {
                     $aux->start_time = ($aux->start_time > $line->start_time) ? $line->start_time : $aux->start_time ;  
                     $aux->end_time = ($aux->end_time < $line->end_time) ? $line->end_time : $aux->end_time;
                     $flag = true;
@@ -231,10 +232,10 @@ class PeriodService {
             }
             if ($flag == true) {
                 $aux->subject = $line->subject;
-                $params[$teaching['teaching_id']] = $aux;
+                $params[$teaching_id] = $aux;
             }
-        }                                       
-        return is_null($params) ? []: $params;       
+        }                                    
+        return $params;       
     }
 
 
@@ -252,19 +253,19 @@ class PeriodService {
                                             ->orderBy('teaching_id', 'DESC')
                                             ->orderBy('periods.start_time', 'DESC')
                                             ->get();
-
-        $params = null;
-        foreach ($teaching_ids as $key => $teaching) {
+                                            
+        $params = [];
+        foreach ($teaching_ids as $key => $teaching_id) {
             $aux = new stdClass;            
             $aux->start_time = '23:59:59';
             $aux->end_time = '00:00:00';                        
-            $aux->teaching_id = $teaching['teaching_id'];
+            $aux->teaching_id = $teaching_id;
             
 
             $flag = false;
 
             foreach ($results as $key => $line) {
-                if ($line->teaching_id == $teaching['teaching_id']) {
+                if ($line->teaching_id == $teaching_id) {
                     $aux->start_time = ($aux->start_time > $line->start_time) ? $line->start_time : $aux->start_time ;  
                     $aux->end_time = ($aux->end_time < $line->end_time) ? $line->end_time : $aux->end_time;
                     $flag = true;
@@ -273,9 +274,9 @@ class PeriodService {
             }
             if ($flag == true) {
                 $aux->subject = $line->subject;
-                $params[$teaching['teaching_id']] = $aux;
+                $params[$teaching_id] = $aux;
             }
-        }     
-        return is_null($params) ? []: $params;       
+        }    
+        return $params;       
     }
 }
