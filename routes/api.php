@@ -11,6 +11,18 @@ use Illuminate\Database\Connection;
 # Self defense
 // Route::get('/wipe', 'api\TestController@index');
 
+//	Gerer l'affichage des erreurs au format JSON
+//  1-	app/Exception/Handler.php
+// 	Modify render Method 
+// replace this line  => return parent::render($request, $exception);
+        // Output error in json format
+// By this	=> return response(['error'    =>  $exception->getMessage()], $exception->getCode() ? '' : 400);
+    
+//	2-	app/Kernel.php  	Modify $routeMiddleware
+//  	'auth' => \Illuminate\Auth\Middleware\Authenticate::class,   //\App\Http\Middleware\Authenticate::class,
+//  	delete under app/Http/Middleware =>	Authenticate.php file
+
+
 Route::group([
 
     'prefix' => 'auth'
@@ -84,6 +96,7 @@ Route::group(
 		Route::get('/v1/{school_id}','api\PeriodController@getSchoolPeriods');	
 		Route::post('/','api\PeriodController@store');	
 		Route::get('/v2/{school_id}', 'api\PeriodController@loadRelationShip');
+		Route::get('/v3/{school_id}', 'api\PeriodController@loadSchoolPeriodGroupedByStartTime');
 	});
 
 	# Event Route

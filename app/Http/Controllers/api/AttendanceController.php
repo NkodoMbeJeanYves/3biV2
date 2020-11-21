@@ -164,9 +164,10 @@ class AttendanceController extends Controller
 
         // fetching all teaching id with their related conditions                    
         $conditions = [];     
-        // fetch class | classrooms | profile
-        $this->loadParameters($school_id);
+
         if (count($teachings)) {
+            // fetch class | classrooms | profile
+            $this->loadParameters($school_id);
             // Build condition (class_id, classroom_id, subject_id, lecturer_id, periods_time)
             return response()->json($this->buildConditionsForTeachingIdNumbers($teachings), 200);   
 
@@ -332,10 +333,7 @@ class AttendanceController extends Controller
             
         # retrieve all students id regarding registration
         $s = [];
-        /* $students = $registrations->map(
-            function ($item, $key) {
-                return $item->student;
-        }); */
+        
         $students = [];
         foreach ($registrations as $key => $registration) {
             array_push($students, $registration->student);
@@ -409,7 +407,7 @@ class AttendanceController extends Controller
     *
     *
     */
-    public function store(Request $request) {
+    // public function store(Request $request) {
 
     	$formDataToCheck = json_decode(file_get_contents("php://input"), TRUE);
         $formData = json_decode(file_get_contents("php://input"));

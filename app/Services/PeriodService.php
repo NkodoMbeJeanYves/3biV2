@@ -135,6 +135,8 @@ class PeriodService {
 
     /**
      * @Comment retrieve grouped school period 
+     *
+     * @comment load periods with all relationShip related with current school
      */
     public function loadGroupedSchoolPeriods(string $school_id) {
         $event = event::where('school_id', $school_id)->latest()->first();
