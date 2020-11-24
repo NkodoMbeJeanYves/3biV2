@@ -191,7 +191,7 @@ class AttendanceController extends Controller
         $conditions = $this->findInvolvedConditionV2($teachings); 
         $normalPeriodTimes = ($this->periodService)->getPeriodDelayByTeachingIdNormalTime($teachings, $this->school_id);
         $extraPeriodTimes = ($this->periodService)->getPeriodDelayByTeachingIdExtraTime($teachings, $this->school_id);
-       
+
         # we need to append required conditions
         foreach ($conditions as $key => $condition) {
  
@@ -407,7 +407,7 @@ class AttendanceController extends Controller
     *
     *
     */
-    // public function store(Request $request) {
+    public function store(Request $request) {
 
     	$formDataToCheck = json_decode(file_get_contents("php://input"), TRUE);
         $formData = json_decode(file_get_contents("php://input"));

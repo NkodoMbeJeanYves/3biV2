@@ -5,7 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-
 class payment extends Model
 {
     use SoftDeletes;
@@ -17,6 +16,7 @@ class payment extends Model
         'deposit_amount',
         'deposit_datetime',
         'remitter_name',
+        'control_number',
         'payment_type',	//'cash','transfer'
         'registration_id',
         'registration_type',
@@ -30,4 +30,9 @@ class payment extends Model
     protected $hidden = [
         'created_at', 'updated_at', 'deleted_at'
     ];
+
+
+    
+
+    
 }

@@ -50,7 +50,7 @@ class Handler extends ExceptionHandler
      */
     public function render($request, Throwable $exception)
     {
-        //return parent::render($request, $exception);
+        return parent::render($request, $exception);
         // Output error in json format
         return response(['error'    =>  $exception->getMessage()], $exception->getCode() ? '' : 400);
     }

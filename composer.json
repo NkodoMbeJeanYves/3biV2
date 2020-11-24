@@ -11,13 +11,15 @@
         "php": "^7.2.5",
         "barryvdh/laravel-cors": "^2.0",
         "fideloper/proxy": "^4.2",
+        "goldspecdigital/laravel-eloquent-uuid": "8.0",
         "guzzlehttp/guzzle": "^7.0.1",
         "intervention/image": "^2.5",
         "laravel/framework": "^8.0",
         "laravel/tinker": "^2.0",
         "laravel/ui": "^3.0",
         "symfony/console": "^5.1",
-        "tymon/jwt-auth": "^1.0.0-rc.2"
+        "tymon/jwt-auth": "^1.0.0-rc.2",
+        "webpatser/laravel-uuid": "^3.0"
     },
     "require-dev": {
         "barryvdh/laravel-debugbar": "^3.5",

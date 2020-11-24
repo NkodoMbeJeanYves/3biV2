@@ -8,6 +8,8 @@ use Dotenv;
 use InvalidArgumentException;*/
 use Illuminate\Database\Connection;
 
+
+
 # Self defense
 // Route::get('/wipe', 'api\TestController@index');
 
@@ -140,6 +142,7 @@ Route::get('attendance/fetch_school_teaching_ref_number/{school_id}','api\Attend
 
 // load student list relate to teaching id
 Route::post('attendance/students','api\AttendanceController@getStudentsRegardingTeachingReferenceNumber');
+
 
 
 /*

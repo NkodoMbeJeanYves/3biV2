@@ -6,6 +6,7 @@ use App\Models\event;
 use App\Models\school;
 use App\Models\day;
 use App\Models\period;
+use App\Models\teaching;
 use App\Models\sub_event;
 use App\Models\event_sub_event;
 use Validator;
@@ -216,7 +217,7 @@ class PeriodService {
                                                 ->orderBy('periods.start_time', 'DESC')
                                                 ->get();
 
-                                               
+        $curDay = $this->extractDayFromTeaching($teaching_ids);                                                                           
         $params = []; 
         foreach ($teaching_ids as $key => $teaching_id) {
             $aux = new stdClass;            
@@ -234,10 +235,26 @@ class PeriodService {
             }
             if ($flag == true) {
                 $aux->subject = $line->subject;
+                $aux->curDay = $curDay[$teaching_id];
                 $params[$teaching_id] = $aux;
             }
         }                                    
         return $params;       
+    }
+
+
+    /**
+     *  @Comment extract teaching day form classdate
+     */
+    public function extractDayFromTeaching(Array $teachings): Array {
+        
+        $formattedDates = teaching::whereIn('teaching_id', $teachings)->get()->map(function($item) {
+            $carbon = new Carbon($item->class_date);
+            return $carbon->isoFormat('dddd D MMM YY'); //saturday 21 Nov 20
+        });
+        
+        return $array_combine = array_combine(array_values($teachings), $formattedDates->toArray());
+        // return $formattedDates->toArray();
     }
 
 
@@ -255,7 +272,9 @@ class PeriodService {
                                             ->orderBy('teaching_id', 'DESC')
                                             ->orderBy('periods.start_time', 'DESC')
                                             ->get();
-                                            
+
+        $curDay = $this->extractDayFromTeaching($teaching_ids);
+
         $params = [];
         foreach ($teaching_ids as $key => $teaching_id) {
             $aux = new stdClass;            
@@ -266,7 +285,7 @@ class PeriodService {
 
             $flag = false;
 
-            foreach ($results as $key => $line) {
+            foreach ($results as $k => $line) {
                 if ($line->teaching_id == $teaching_id) {
                     $aux->start_time = ($aux->start_time > $line->start_time) ? $line->start_time : $aux->start_time ;  
                     $aux->end_time = ($aux->end_time < $line->end_time) ? $line->end_time : $aux->end_time;
@@ -276,6 +295,7 @@ class PeriodService {
             }
             if ($flag == true) {
                 $aux->subject = $line->subject;
+                $aux->curDay = $curDay[$teaching_id];
                 $params[$teaching_id] = $aux;
             }
         }    

@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\URL;
 # resize uploaded files
 use Intervention\Image\Facades\Image;
 use File;
+
  
 
 class Controller extends BaseController
@@ -44,32 +45,7 @@ class Controller extends BaseController
 
         $image = $request->file('file'); 
         $partialPathName = '/storage/images/'.$tableName;
-        // check if it is possible to store image in originalpath by creating it
-        // $originalpath = public_path($partialPathName);
-        # retrieve file name if it already exists
-        // $fullpath = ("\App\Models\\$model")::find($primaryColValue)->file;
-        # switch size via model
-        
-        # Decommentez le bloc suivant si vous ne voulez pas creer les dossier manuellement.
-        /*if ($fullpath){
-            # delete older file
-            $fileName = explode('/', $fullpath)[4];
-            file_put_contents('pwd.txt', $originalpath.'/'.$fileName);
-            // do not delete default file 
-            if($fileName != 'default.png'){
-                // Value is not URL but directory file path
-                if(File::exists($originalpath.'/'.$fileName)) {
-                    File::delete($originalpath.'/'.$fileName);
-                    // Storage::delete($originalpath.'/'.$fileName);
-                }
-                // unlink($originalpath.'/'.$fileName); 
-             }                
-        }else{
-            $this->createDirecrotoryUnderStoragePath($partialPathName);
-        }*/
 
-
-        // $fileName = explode('/', $fullpath)[4];
         # save new file
         $fileName = $this->saveImage($tableName, $request, $model);
         // $img->save($originalpath.'/'.$fileName);
@@ -109,22 +85,13 @@ class Controller extends BaseController
                 }
 
                 $destinationPath = public_path('/storage/images/'.$tableName);
-                $img = Image::make($image->getRealPath())->resize(200, 200); //$_FILES['file']['tmp_name']
-                // $f = $img->save($destinationPath.'/'.$imagename);
-                // return $f->basename;
-                /*$photo->move($destinationPath, $imagename);
-
-                $destinationPath = storage_path('app/public/images/'.$tableName);
-                
-                $img->save($destinationPath.'/'.$imagename);*/
+                $img = Image::make($image->getRealPath())->resize(200, 200); 
                 break;
 
             case 'schools':
                 $img = Image::make($image->getRealPath());
                 $destinationPath = public_path('/storage/images/'.$tableName);
-                // $destinationPath = storage_path('app/public/images/'.$tableName);
-                // $img = Image::make($image);
-                // $img->save($destinationPath.'/'.$imagename);
+ 
                 break;
             default:
                 # code...
@@ -132,18 +99,8 @@ class Controller extends BaseController
                 // $destinationPath = URL::to('public/images/categories');
                 $destinationPath = public_path('/storage/images/'.$tableName);
                 
-                // $destinationPath = storage_path('app/public/images/'.$tableName);
-                // $img = Image::make($image);
-                // $img->save($destinationPath.'/'.$imagename);
                 break;
         }
-        
-
-        /*$img->resize(100, 100, function ($constraint) {
-            $constraint->aspectRatio();
-        })->save($destinationPath.'/'.$imagename);*/
-
-        // $destinationPath = URL::to('public/storage/images/'.$tableName);
         
 
         return ($img->save($destinationPath.'/'.$imagename))->basename;
@@ -172,6 +129,48 @@ class Controller extends BaseController
                 return $id;
             }
         }
+    }
+
+    /**
+     * @param $model model entity
+     * @param $fieldName field on which we are going to compare occurences
+     */
+    public function generate_Uuid($model, $fieldName) {
+        while (1) {
+            $param = Str::uuid()->toString();
+            $param = $param == null || $param == '' ? $this->v4() : $this->v5('unknow');  
+            if (is_null($model::where("{$fieldName}", $param)->first())) {
+                return $param;
+            }
+        }
+    }
+
+    /**
+     * @comment method to generate a universal unique identifier
+     */
+    private function v4() {
+        $data = openssl_random_pseudo_bytes(16, $secure);
+        if (false === $data) { return false; }
+        $data[6] = chr(ord($data[6]) & 0x0f | 0x40); // set version to 0100
+        $data[8] = chr(ord($data[8]) & 0x3f | 0x80); // set bits 6-7 to 10
+        return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($data), 4));
+    }
+    
+    
+    /**
+     * @comment method to generate a universal unique identifier
+     * @comment https://tools.ietf.org/html/rfc4122#section-4.3
+     */
+    private function v5($name) {
+        $hash = sha1($name, false);
+        return sprintf(
+            '%s-%s-5%s-%s-%s',
+            substr($hash,  0,  8),
+            substr($hash,  8,  4),
+            substr($hash, 17,  3),
+            substr($hash, 24,  4),
+            substr($hash, 32, 12)
+        );
     }
 
     /**
