@@ -138,7 +138,7 @@ class Controller extends BaseController
     public function generate_Uuid($model, $fieldName) {
         while (1) {
             $param = Str::uuid()->toString();
-            $param = $param == null || $param == '' ? $this->v4() : $this->v5('unknow');  
+            // $param = $param == null || $param == '' ? $this->v4() : $this->v5('unknow');
             if (is_null($model::where("{$fieldName}", $param)->first())) {
                 return $param;
             }

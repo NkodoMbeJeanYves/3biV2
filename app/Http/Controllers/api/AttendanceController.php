@@ -426,14 +426,16 @@ class AttendanceController extends Controller
             'course_id'     =>  $formData->course_id
         ];
         # process under scheduled_class
-        $requested_objet = scheduled_class::where($current_condition)->first(); 
-        // $formData->teaching_id = $teaching->teaching_id;
+        $requested_condition = scheduled_class::where($current_condition)->first(); 
+        
 
         $result = null;
+
         # fetch period to compare each day with provided periods
         # array of { period : '', day : ''} keyBy period_id
         $fetchedPeriod = $this->fetchPeriod();
-        if (is_null($requested_objet)) {
+
+        if (is_null($requested_condition)) {
             # deep into extra time process
             $result = $this->extraTimeProcess($formData, $fetchedPeriod);
         } else {
@@ -458,7 +460,6 @@ class AttendanceController extends Controller
         ];
         $results = null; 
 
-
         # Beginning transaction
         DB::transaction(function() use($current_condition, &$results, $formData, $fetchedPeriod) {
 
@@ -471,21 +472,24 @@ class AttendanceController extends Controller
             $formData->teaching_id = $teaching->teaching_id;
             # check if model exists or create a new instance
             $extra_condition = extra_condition::firstOrCreate($current_condition);
-            $requested_objet = scheduled_class::where($current_condition)->first(); 
+            $requested_condition = scheduled_class::where($current_condition)->first(); 
             $extraTimes = []; $normalTimes = [];
-            foreach ($formData->periods as $key => $period) {
 
-                # toujours s'assurer que le jour du cours soit celui de la period 
-                # getDay(class_date) = $period->day
-                # comparer le jour de la date fourni avec le jour de la periode
-                $dt = new Carbon($formData->class_date);
-                # -1 car le jour 1 correspond à dimanche en programmation à la 
-                # difference du jour 1 qui est lundi dans les periodes
-                $provided_day_number = $dt->format('d') - 1;
+            # toujours s'assurer que le jour du cours soit celui de la period 
+            # getDay(class_date) = $period->day
+            # comparer le jour de la date fourni avec le jour de la periode
+            $dt = new Carbon($formData->class_date);
+            # -1 car le jour 1 correspond à dimanche en programmation à la 
+            # difference du jour 1 qui est lundi dans les periodes
+            # notre premier jour de semaine est le lundi alors que celui
+            # utilisé habituellement est le dimanche, raison du -1
+            $provided_day_number = ($dt->format('d') - 1) % 7; 
+
+            foreach ($formData->periods as $key => $period) {
 
                 if ( $provided_day_number == $fetchedPeriod[$period]->day ) {
                     $where = [
-                        'scheduled_class_id'    =>  $requested_objet->scheduled_class_id,
+                        'scheduled_class_id'    =>  $requested_condition->scheduled_class_id,
                         'period_id' =>  $period
                     ];
                     
@@ -519,7 +523,7 @@ class AttendanceController extends Controller
             }
 
         });
-        
+
         return $results;
 
     }
@@ -532,7 +536,7 @@ class AttendanceController extends Controller
     * Create new extra_condition within extra_conditions table
     * @return mixed 
     */
-    public function extraTimeProcess($formData = null, $fetchedPeriod) {
+    public function extraTimeProcess($formData, $fetchedPeriod) {
 
         $attach_extra_times = null;
         DB::transaction(function () use ($formData, &$attach_extra_times, $fetchedPeriod) {
@@ -553,17 +557,19 @@ class AttendanceController extends Controller
             ];
 
             $extra_condition = extra_condition::firstOrCreate($currentCondition);
+            # toujours s'assurer que le jour du cours soit celui de la period getDay(class_date) = $period->day
+            # getDay(class_date) = $period->day
+            # comparer le jour de la date fourni avec le jour de la periode
+            $dt = new Carbon($formData->class_date);
+            # -1 car le jour 1 correspond à dimanche en programmation à la 
+            # difference du jour 1 qui est lundi dans les periodes
+            # notre premier jour de semaine est le lundi alors que celui
+            # utilisé habituellement est le dimanche, raison du -1
+            $provided_day_number = ($dt->format('d') - 1) % 7;
             
             # Attach each period with related extra condition (Requested teaching_id | periods | extra_condition_id)
             $extraTimes = [];
             foreach ($formData->periods as $key => $period) {
-                # toujours s'assurer que le jour du cours soit celui de la period getDay(class_date) = $period->day 
-                # getDay(class_date) = $period->day
-                # comparer le jour de la date fourni avec le jour de la periode
-                $dt = new Carbon($formData->class_date);
-                # -1 car le jour 1 correspond à dimanche en programmation à la 
-                # difference du jour 1 qui est lundi dans les periodes
-                $provided_day_number = $dt->format('d') - 1;
 
                 if ( $provided_day_number == $fetchedPeriod[$period]->day ) {
                     $extraTimes [] = [
@@ -574,7 +580,10 @@ class AttendanceController extends Controller
                 }
             }
             
-            $attach_extra_times = extra_time::insert($extraTimes);
+            if (count($extraTimes)) {
+                $attach_extra_times = extra_time::insert($extraTimes);
+            }
+
         });
         
         return $attach_extra_times;
