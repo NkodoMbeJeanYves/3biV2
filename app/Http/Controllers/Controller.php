@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Http\Controllers;
 
 use Illuminate\Foundation\Bus\DispatchesJobs;
@@ -12,7 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
-# resize uploaded files
+// resize uploaded files
 use Intervention\Image\Facades\Image;
 use File;
 
@@ -26,39 +25,48 @@ class Controller extends BaseController
      * @Comment upload file
      */
     
-    public function fileUpload(Request $request){
+    public function fileUpload(Request $request) {
         /*  Alternative #1 en cas d'upload */
-      if ($request->hasFile('file')) 
-      {
+        if ($request->hasFile('file')) {
 
-        $request->validate([
-            'file' => 'required|image|mimes:jpeg,png,jpg,gif,svg|max:2048'
-        ]);
+            $request->validate(
+                [
+                'file' => 'required|image|mimes:jpeg,png,jpg,gif,svg|max:2048'
+                ]
+            );
 
-        $messages = [];
+            $messages = [];
         
-        // retrieve involved model
-        $tableName = $request['tableName'];
-        $primaryColName = $request['primaryColName'];
-        $model = substr($primaryColName, 0, strlen($primaryColName) - 3);  
-        $primaryColValue = $request['primaryColValue'];
+            // retrieve involved model
+            $tableName = $request['tableName'];
+            $primaryColName = $request['primaryColName'];
+            $model = substr($primaryColName, 0, strlen($primaryColName) - 3);  
+            $primaryColValue = $request['primaryColValue'];
 
-        $image = $request->file('file'); 
-        $partialPathName = '/storage/images/'.$tableName;
+            $image = $request->file('file'); 
+            $partialPathName = '/storage/images/'.$tableName;
 
-        # save new file
-        $fileName = $this->saveImage($tableName, $request, $model);
-        // $img->save($originalpath.'/'.$fileName);
-        $fullNameUnderPublicPath = $partialPathName.'/'.$fileName;
-        DB::table($tableName)->where($primaryColName, $primaryColValue)->update(['file' => $fullNameUnderPublicPath]);
-        return response()->json($fullNameUnderPublicPath);
+            # save new file
+            $fileName = $this->saveImage($tableName, $request, $model);
+            // $img->save($originalpath.'/'.$fileName);
+            $fullNameUnderPublicPath = $partialPathName.'/'.$fileName;
+            DB::table($tableName)->where($primaryColName, $primaryColValue)->update(
+                [
+                    'file' => $fullNameUnderPublicPath
+                ]
+            );
+            return response()->json($fullNameUnderPublicPath);
         
       }
-      return response()->json('Any file provided');
+        return response()->json('Any file provided');
     }
 
 
-    
+    /**
+     * @Param $tableName | folder in which we are going to save file
+     * @Param Request $request
+     * @Param $model | model used to laud right Class within models folder
+     */
     function saveImage($tableName, Request $request, $model) {
         // get primaryColumn Value
         $primaryColValue = $request['primaryColValue'];
@@ -69,37 +77,37 @@ class Controller extends BaseController
         // get extension file
         $ext = $image->getClientOriginalExtension();
         // check if file already exists or not
-        if (is_null($fullpath)){
+        if (is_null($fullpath)) {
             $imagename = time().'.'.$ext;
         } else {
             $imagename = explode('/', $fullpath)[4]; 
         }
 
         switch ($tableName) {
-            case 'profiles' || 'students':
-                # resize using profile component width = 200, height = 200
-                if($tableName == 'profiles'){
-                    $destinationPath = public_path('/storage/images/'.$tableName.'/thumbnails');
-                    $thumb_img = Image::make($image->getRealPath())->resize(100, 100);
-                    $thumb_img->save($destinationPath.'/'.$imagename,80);
-                }
+        case 'profiles' || 'students':
+            # resize using profile component width = 200, height = 200
+            if ($tableName == 'profiles') {
+                $destinationPath = public_path('/storage/images/'.$tableName.'/thumbnails');
+                $thumb_img = Image::make($image->getRealPath())->resize(100, 100);
+                $thumb_img->save($destinationPath.'/'.$imagename, 80);
+            }
 
-                $destinationPath = public_path('/storage/images/'.$tableName);
-                $img = Image::make($image->getRealPath())->resize(200, 200); 
-                break;
+            $destinationPath = public_path('/storage/images/'.$tableName);
+            $img = Image::make($image->getRealPath())->resize(200, 200); 
+            break;
 
-            case 'schools':
-                $img = Image::make($image->getRealPath());
-                $destinationPath = public_path('/storage/images/'.$tableName);
- 
-                break;
-            default:
-                # code...
-                $img = Image::make($image)->resize(200, 200);
-                // $destinationPath = URL::to('public/images/categories');
-                $destinationPath = public_path('/storage/images/'.$tableName);
-                
-                break;
+        case 'schools':
+            $img = Image::make($image->getRealPath());
+            $destinationPath = public_path('/storage/images/'.$tableName);
+
+            break;
+        default:
+            # code...
+            $img = Image::make($image)->resize(200, 200);
+            // $destinationPath = URL::to('public/images/categories');
+            $destinationPath = public_path('/storage/images/'.$tableName);
+            
+            break;
         }
         
 
@@ -111,7 +119,7 @@ class Controller extends BaseController
      * @function CreateDirectory
      * create required directory if not exist and set permissions
      */
-    public function createDirecrotoryUnderStoragePath(String $pathName = null)
+    public function createDirectoryUnderStoragePath(String $pathName = null)
     {
         $path = public_path($pathName);
             if(!File::isDirectory($path)){
@@ -133,7 +141,7 @@ class Controller extends BaseController
 
     /**
      * @param $model model entity
-     * @param $fieldName field on which we are going to compare occurences
+     * @param $fieldName field in which we are going to compare occurences
      */
     public function generate_Uuid($model, $fieldName) {
         while (1) {
