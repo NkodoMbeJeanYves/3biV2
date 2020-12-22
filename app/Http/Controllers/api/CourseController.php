@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\api;
 
 use App\Models\course;
+use App\Models\factor;
+use App\Models\school;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use Validator;
@@ -31,6 +33,7 @@ class CourseController extends Controller
     {
         $courses = course::all();
         return response()->json($courses);
+
     }
 
     /**
@@ -55,6 +58,7 @@ class CourseController extends Controller
             $validator = Validator::make($formDataToCheck, [
                                                  'course_name'  =>  'bail|required|string|max:50',
                                                  'course_code'  =>  'bail|required|string|max:7',
+                                                 'coef'         =>  'bail|required|numeric',
                                                  'is_checked'     =>  'boolean|max:1',
                                              ],$messages);
                                            
@@ -75,6 +79,17 @@ class CourseController extends Controller
                      'school_id'     => $formData->school_id
                  ]); 
         $course->save();   // persisted 
+        $course->fill([
+            'course_id' => $course_id
+        ]);
+
+        // store factor
+        factor::insert([
+            'course_id' => $course_id,
+            'event_id'  => school::find($formData->school_id)->LastEvent->event_id,
+            'factor'    => $formData->coef 
+        ]);
+
         return response()->json(['data' => $course, 'status' => 200]);
     }
 
