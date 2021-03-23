@@ -7,7 +7,7 @@ use Illuminate\Support\Str;/*
 use Dotenv;
 use InvalidArgumentException;*/
 use Illuminate\Database\Connection;
-
+use Illuminate\Support\Collection;
 
 
 # Self defense
@@ -119,6 +119,8 @@ Route::group(
 	# Registration Route
 	Route::apiResource('registration','api\RegistrationController');
 	Route::get('registration/v1/{school_id}','api\RegistrationController@getSchoolRegistrations');
+	# Fetch Learner Regarding Class or Field
+	Route::post('registration/v2/learners','api\RegistrationController@fetchLearnerRegardingClassorField');
 
 	# Payment Route
 	Route::apiResource('payment','api\PaymentController');
@@ -132,18 +134,26 @@ Route::post('/upload', 'Controller@fileUpload');
 # Current test Route
 Route::get('attendance/{school_id}', 'api\AttendanceController@getRegisteredStudents');
 
+Route::get('attendance', 'api\AttendanceController@test');
 // store lecturer attendance
 Route::post('attendance', 'api\AttendanceController@store');
 // store student attendance
 Route::post('attendance/students/v1', 'api\AttendanceController@storeLearnerAttendance');
 
-// fetch teaching reference number
-Route::get('attendance/fetch_school_teaching_ref_number/{school_id}','api\AttendanceController@fetchTeachingReferenceNumber');
+// fetch teaching reference number for all lecturers
+Route::get('attendance/fetch_school_teaching_ref_number/{school_id}','api\AttendanceController@fetchTeachingReferenceNumberForLecturers');
+
+// fetch teaching reference number for a particular lecturer
+// Route::get('attendance/fetch_school_teaching_ref_number/{school_id}','api\AttendanceController@fetchTeachingReferenceNumberForLecturer');
+
+//
+Route::post('attendance/working-time-report','api\AttendanceController@workingTimeReport');
 
 // load student list relate to teaching id
 Route::post('attendance/students','api\AttendanceController@getStudentsRegardingTeachingReferenceNumber');
 
-
+// Working Hour Payment
+Route::apiResource('working_hour_payment', 'api\WorkingHourController');
 
 /*
 	Route::get('last', function(){
@@ -207,6 +217,7 @@ Route::get('pwd', function(){
 	// lock account during two days if four unsuccessfull attemps occurs.
 	// DB::select('alter user $user failed_login_attempts 4 password_lock_time 2');
 });*/
+
 
 
 

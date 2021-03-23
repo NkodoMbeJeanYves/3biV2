@@ -12,6 +12,7 @@ class course extends Model
     public $timestamps = true;
 
     use SoftDeletes;
+    
 
     protected $dates = ['deleted_at'];
     public $incrementing = "false";

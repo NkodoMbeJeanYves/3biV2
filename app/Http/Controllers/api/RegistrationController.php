@@ -153,14 +153,49 @@ class RegistrationController extends Controller
     }
 
     /**
-     * Display the specified resource.
+     * Fetch Learners regarding class or field.
      *
-     * @param  \App\Models\registration  $registration
+     * 
      * @return \Illuminate\Http\Response
      */
-    public function show(registration $registration)
+    public function fetchLearnerRegardingClassorField()
     {
-        //
+        $formDataToCheck = json_decode(file_get_contents("php://input"), TRUE);
+        $formData = json_decode(file_get_contents("php://input"));
+             
+        if (is_null($formDataToCheck)) {
+            $formDataToCheck = $request->all();
+            $formData = $request;
+        }
+
+        // We need to retrieve some dummy informations like classroom_name, class_name, lecturer_name
+        // regarding teachingId
+        // We dont need to send that to front-end user
+        // fetch class | classrooms | profile
+
+        $school = school::find($formData->school_id);
+
+        $currentEvent = $formData->event_id;
+
+        $involvedClassOrField = $formData->class_id;
+        
+        $registrations = $school->school_type == 'UNIVERSITY' ? 
+                registration_channel::where('event_id', $currentEvent)
+                                      ->where('channel_id', $involvedClassOrField)
+                                      ->get():
+                registration_class::where('event_id', $currentEvent)
+                                    ->where('class_id', $involvedClassOrField)
+                                    ->get();
+            
+        # retrieve all students id regarding registration
+        
+        $students_id = $registrations->pluck('student_id')->toArray();
+        
+        $students = student::whereIn('student_id', $students_id)->get();
+        
+
+        return response()->json(['data'=> $students, 'status' => 200]);
+
     }
 
     /**

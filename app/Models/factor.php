@@ -8,6 +8,9 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 class factor extends Model
 {
     use HasFactory;
+
+    public $timestamps = true;
+
     public $table = "factor_by_events";
 
     protected $primaryKey = "factor_id";
@@ -18,7 +21,9 @@ class factor extends Model
         'factor'
     ];
 
-    
+    protected $hidden = [
+        'created_at', 'updated_at', 'deleted_at'
+    ];
 
     /*protected $with = ['students_class', 'students_channel'];
 

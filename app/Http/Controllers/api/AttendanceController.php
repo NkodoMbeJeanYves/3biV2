@@ -60,7 +60,7 @@ class AttendanceController extends Controller
         $dt = Carbon::now('Africa/Douala');    
         return (object) [
                 'first_day' => (Carbon::now())->addDay() ,
-                'last_day'  => (Carbon::now())->subDays(28) 
+                'last_day'  => (Carbon::now())->subDays(100) 
         ]; 
     }
 
@@ -130,7 +130,7 @@ class AttendanceController extends Controller
                                                     ->transform(function($item, $key) {
                                                         return $item;
                                                     });
-        $this->courses = course::where('school_id', $school_id)
+        $this->coursesList = course::where('school_id', $school_id)
                                                     ->get()
                                                     ->keyBy('course_id')
                                                     ->transform(function($item, $key) {
@@ -142,15 +142,16 @@ class AttendanceController extends Controller
 
 
     /**
-    *   @Comment Fetch teaching reference number 
+    *   @Comment Fetch teaching reference number for lecturers
     *   
     */
-    public function fetchTeachingReferenceNumber($school_id) {
+    public function fetchTeachingReferenceNumberForLecturers($school_id) {
 
-        // load previous week date
+        // define period
         $dates = $this->get_first_and_last_day_of_week();
-        $first = (Carbon::parse($dates->first_day))->toDateTimeString();
-        $last =  (Carbon::parse($dates->last_day))->toDateTimeString();
+
+        $first = $first ?? (Carbon::parse($dates->first_day))->toDateTimeString();
+        $last =  $last ?? (Carbon::parse($dates->last_day))->toDateTimeString();
         $event = (event::where('school_id', $school_id)->latest()->first());
 
         // Fetching all teachings id 
@@ -179,6 +180,48 @@ class AttendanceController extends Controller
     }
 
 
+    /**
+    *   @Comment Fetch teaching reference number for a particular lecturer
+    *   
+    */
+    public function fetchTeachingReferenceNumberForLecturer($school_id, Date $first = null, Date $last = null, string $profile_id = null ) {
+
+        $event = (event::where('school_id', $school_id)->latest()->first());
+
+        // Fetching all teachings id 
+        // telecharger toutes les prestations des enseignants datant de moins d'une semaine
+        // periode define précédemment
+        $teachings = teaching::query();
+
+        if (!is_null($first) && !is_null($last)) {
+            $first = (Carbon::parse($first))->toDateTimeString();
+            $last =  (Carbon::parse($last))->toDateTimeString();
+
+            $teachings->whereBetween('class_date', [$last, $first])
+                        ->where('event_id', $event->event_id)
+                        ->latest()
+                        ->pluck('teaching_id')
+                        ->toArray();
+        }
+
+
+        // fetching all teaching id with their related conditions                    
+        $conditions = [];     
+
+        if (count($teachings)) {
+            // fetch class | classrooms | profile
+            $this->loadParameters($school_id);
+            // Build condition (class_id, classroom_id, subject_id, lecturer_id, periods_time)
+            return response()->json($this->buildConditionsForTeachingIdNumbers($teachings), 200);   
+
+        } else {
+
+            return response()->json($conditions, 200);
+        }
+                                           
+    }
+
+
 
     /**
      *
@@ -187,46 +230,20 @@ class AttendanceController extends Controller
      *
      */
     public function buildConditionsForTeachingIdNumbers(Array $teachings) {
-        
-        $conditions = $this->findInvolvedConditionV2($teachings); 
-        $normalPeriodTimes = ($this->periodService)->getPeriodDelayByTeachingIdNormalTime($teachings, $this->school_id);
-        $extraPeriodTimes = ($this->periodService)->getPeriodDelayByTeachingIdExtraTime($teachings, $this->school_id);
 
-        # we need to append required conditions
-        foreach ($conditions as $key => $condition) {
- 
-            $condition->profile = $this->profilesList[$condition->profile_id];   
-            $condition->classroom = $this->classroomsList[$condition->classroom_id];  
-            $condition->subject = $this->coursesList[$condition->course_id];  
-            $condition->field = $this->classesList[$condition->class_id];
-            // check if it is null
-            // teaching_id should be related with extra_time or normal_time but not both
-            if (count($normalPeriodTimes) != 0 ) {
-                if (array_key_exists($condition->teaching_id, $normalPeriodTimes)) {
-                    $condition->startAndEndTimeRegardingTeaching = $normalPeriodTimes[$condition->teaching_id];
-                }
-            }
-
-            if (count($extraPeriodTimes) != 0) {
-                if (array_key_exists($condition->teaching_id, $extraPeriodTimes)) {
-                    $condition->startAndEndTimeRegardingTeaching = $extraPeriodTimes[$condition->teaching_id];
-                }
-            }
-
-        }    
-        // sort by teaching_id
-        $collections = collect($conditions)->sortByDesc('teaching_id');
-
-        return $collections->values()->all();             
+        return ($this->wrap_2($teachings))->values()->all();             
     }
     
 
-
+    /**
+    * Retrieve Condition regarding each teaching number reference
+    * even teaching_id were repeated, related conditions remain the same
+    */
     public function findInvolvedConditionV2(Array $teaching_ids): Array{
         $teach = $teaching_ids;
 
         $normal_lines = null; $extra_lines = null;
-        //$t = normal_time::whereIn('teaching_id', $teaching_ids)->latest()->get()->unique('teaching_id');  
+
         $normal_lines = normal_time::whereIn('teaching_id', $teaching_ids)->latest()->get()->unique('teaching_id')->toArray();
 
         $extra_lines = extra_time::whereIn('teaching_id', $teaching_ids)->latest()->get()->unique('teaching_id')->toArray();
@@ -247,10 +264,13 @@ class AttendanceController extends Controller
             }
         }
 
+
         foreach ($extra_lines as $key => $extra_line) {
             if (count($extra_line) != 0) {
                 $condition_line = DB::table('extra_conditions')
+                                    ->join('extra_times', 'extra_times.extra_condition_id','=','extra_conditions.extra_condition_id')
                                     ->select('extra_conditions.*')
+                                    ->where('teaching_id',$extra_line['teaching_id'])
                                     ->where('extra_conditions.deleted_at', Null)
                                     ->selectRaw($extra_line['teaching_id'].' as teaching_id')
                                     ->first();
@@ -302,7 +322,7 @@ class AttendanceController extends Controller
     *
     *
     */
-    public function getStudentsRegardingTeachingReferenceNumber() {
+    public function getStudentsRegardingTeachingReferenceNumber(Request $request) {
 
         $formDataToCheck = json_decode(file_get_contents("php://input"), TRUE);
         $formData = json_decode(file_get_contents("php://input"));
@@ -332,16 +352,11 @@ class AttendanceController extends Controller
                                     ->get();
             
         # retrieve all students id regarding registration
-        $s = [];
+        // $s = [];
         
         $students = [];
         foreach ($registrations as $key => $registration) {
             array_push($students, $registration->student);
-        }
-
-
-        foreach ($students as $key => $student) {
-            array_push($s, $student);
         }
         
         $students_id = [];
@@ -349,11 +364,6 @@ class AttendanceController extends Controller
             array_push($students_id, $student->student_id);
         }
 
-        $replacements = [];
-        foreach ($students as $student) {
-            array_push($replacements, $student);
-        }
-        $students = $replacements;
         # eager loading students with attendance
         if ($school->school_type == 'UNIVERSITY') {
             $teachered = teachered_channel::whereIn('student_id', $students_id)
@@ -625,5 +635,256 @@ class AttendanceController extends Controller
             $data = DB::table($modelName)->insert($attendances);
             
         return response()->json(['data' => $data,'status' => 200]);
+    }
+
+
+    /**
+    * @comment fetch teaching_id for all lecturer regarding normal time
+    * @comment we will get several lines depending on period_id, in that case we will also get
+    * the total number of hour the lecturer did by counting them
+    * @return collection
+    * 
+    * ToDo We need to precose Event_id
+    */
+    public function workingTimeReport(Request $request) {
+        
+        $formDataToCheck = json_decode(file_get_contents("php://input"), TRUE);
+        $formData = json_decode(file_get_contents("php://input"));
+            
+        if (is_null($formDataToCheck)) {
+            $formDataToCheck = $request->all();
+            $formData = $request;
+        }
+
+        $school_id = $formData->school_id;
+        // retrieve last event
+        $event = (event::where('school_id', $school_id)->latest()->first());
+        $first = (Carbon::parse($formData->firstDate))->toDateTimeString();
+        $last =  (Carbon::parse($formData->lastDate))->toDateTimeString();
+
+        // Normal_times
+        $results = DB::table('scheduled_class_periods')
+                        ->join('scheduled_class', 'scheduled_class_periods.scheduled_class_id','=','scheduled_class.scheduled_class_id')
+                        ->join('normal_times', 'normal_times.scheduled_class_period_id','=','scheduled_class_periods.scheduled_class_period_id')
+                        ->join('teachings', 'teachings.teaching_id', '=', 'normal_times.teaching_id')
+                        ->where('teachings.event_id', '=', $event->event_id)
+                        ->whereBetween('teachings.class_date', [$first, $last])
+                        ->where('scheduled_class.deleted_at', Null)
+                        ->where('scheduled_class_periods.deleted_at', Null)
+                        ->where('normal_times.deleted_at', Null)
+                        ->distinct()
+                        ->get(['scheduled_class.profile_id','normal_times.teaching_id','scheduled_class_periods.period_id']);
+
+        // Extra_times
+        $results_1 = DB::table('extra_conditions')
+                ->join('extra_times', 'extra_times.extra_condition_id','=','extra_conditions.extra_condition_id')
+                ->join('teachings', 'teachings.teaching_id', '=', 'extra_times.teaching_id')
+                ->whereBetween('teachings.class_date', [$first, $last])
+                ->where('teachings.event_id', '=', $event->event_id)
+                ->select('extra_conditions.profile_id', 'extra_times.teaching_id', 'extra_times.period_id')
+                ->where('extra_times.deleted_at', NULL)
+                ->where('extra_conditions.deleted_at', Null)
+                ->get();
+
+        $mergedCollection = $results->merge($results_1);
+
+        // set total hour regarding teaching_id | Array
+        $counts = $mergedCollection->countBy(function($item){
+            return $item->teaching_id;
+        });
+        
+        /*$transformMergedCollection = $mergedCollection->map(function($item, $key) use($counts){
+            $item->count = ($counts->toArray())[$item->teaching_id];
+            return $item;
+        });*/
+
+        // Load parameters
+        // fetch class | classrooms | profile
+        $this->loadParameters($school_id);
+
+        // define profile member
+        $mapped = $mergedCollection->map(function($item, $key) {
+            $item->profile = $this->profilesList[$item->profile_id];
+            return $item;
+        });
+
+        // make collection unique by teaching_id
+        $uniqueCollection = $mapped->unique(function($item) {
+                return $item->teaching_id;
+        });
+
+        // transform to array of teaching_id
+        $pluckedCollection = $uniqueCollection->pluck('teaching_id')->toArray(); 
+
+        $wrapped = $this->wrap_2($pluckedCollection)->map(function($item, $key) use($counts){
+            $item->count = ($counts->toArray())[$item->teaching_id];
+            return $item;
+        });
+
+        $grouped = $wrapped->groupBy('profile_id')->sortByDesc('teaching_id');
+        return $grouped->values()->all();
+    }
+
+
+    /**
+    * @comment fetch teaching_id for all lecturer regarding extra time
+    * 
+    * @return collection
+    * ToDo We need to precose Event_id
+    */
+    public function fetchTeachingIdByLecturerExtraTimes(string $school_id = null, string $first, string $last) {
+        
+        // retrieve last event
+        $event = (event::where('school_id', $school_id)->latest()->first());
+        $first = (Carbon::parse($first))->toDateTimeString();
+        $last =  (Carbon::parse($last))->toDateTimeString();
+
+        $results = DB::table('extra_conditions')
+                        ->join('extra_times', 'extra_times.extra_condition_id','=','extra_conditions.extra_condition_id')
+                        ->join('teachings', 'teachings.teaching_id', '=', 'extra_times.teaching_id')
+                        ->whereBetween('teachings.class_date', [$first, $last])
+                        ->where('teachings.event_id', '=', $event->event_id)
+                        ->select('extra_conditions.profile_id', 'extra_times.teaching_id', 'extra_times.period_id')
+                        ->where('extra_times.deleted_at', NULL)
+                        ->where('extra_conditions.deleted_at', Null)
+                        ->get();
+
+        return $this->wrap($results, $event->event_id);             
+        // return response()->json(['data' => $filteredResults,'status' => 200]);
+    }
+
+    /**
+    * @Comment map, group and retrieve unique item
+    * from collection
+    *
+    */
+    public function wrap($collections, $event_id, $arg = null) {
+        // we must define a criteria else we will fetch all data each time                      
+        $filters = teaching::where('event_id',$event_id)->pluck('teaching_id');
+
+        // Fetch all periodCount into each $results Value, in that way, we will be able to know
+        // the total hour for each class regarding teaching reference number
+        // retrieve number of hour for each teaching reference number
+        // and append them to each teaching_id
+        $arg = [];
+        foreach ($filters as $key => $value) {
+            # code...
+            $cpt = 0;
+            $collections->map(function($item, $key) use (&$cpt, $value){ 
+
+                if ($item->teaching_id == $value) {
+                    $cpt = $cpt + 1; 
+                }
+            });
+
+            $arg[$value] = $cpt;
+        }
+        $collections->map(function($item, $key) use($arg){
+            $item->count_period = $arg[$item->teaching_id];
+        });
+
+        if (is_null($arg)) {
+            $filteredResults = $collections->unique(function($item) {
+                return $item->teaching_id;
+            });            
+        }
+
+        
+        return $filteredResults;             
+        
+
+    }
+
+
+    /**
+    *   @return FormattedString period
+    *
+    */
+    public function wrap_2(Array $teachings) {
+        // set conditions
+        $conditions = $this->findInvolvedConditionV2($teachings); 
+
+        // set Array $normalPeriodTimes
+        /* [31 => {
+            +"start_time": "15:00:00"
+            +"end_time": "17:00:00"
+            +"teaching_id": 31
+            +"subject": "Database & MERISE"
+            +"curDay": "Monday 23 Nov 20"
+          }
+          32 => {
+            +"start_time": "17:00:00"
+            +"end_time": "19:00:00"
+            +"teaching_id": 32
+            +"subject": "Database & MERISE"
+            +"curDay": "Monday 9 Nov 20"
+          }]
+        */
+        $normalPeriodTimes = ($this->periodService)->getPeriodDelayByTeachingIdNormalTime($teachings, $this->school_id);
+
+        // set Array $extraPeriodTimes
+        /* [31 => {
+            +"start_time": "15:00:00"
+            +"end_time": "17:00:00"
+            +"teaching_id": 31
+            +"subject": "Database & MERISE"
+            +"curDay": "Monday 23 Nov 20"
+          }
+          32 => {
+            +"start_time": "17:00:00"
+            +"end_time": "19:00:00"
+            +"teaching_id": 32
+            +"subject": "Database & MERISE"
+            +"curDay": "Monday 9 Nov 20"
+          }]
+        */
+        $extraPeriodTimes = ($this->periodService)->getPeriodDelayByTeachingIdExtraTime($teachings, $this->school_id);
+        
+        // merge colllection
+        $mergedCollection = (collect($normalPeriodTimes)->merge(collect($extraPeriodTimes)))->groupBy('teaching_id');
+        // transform each array to an element with formattedTimeString
+        $mergedCollection->map(function($item, $key) {
+            
+            if (isset($item[1])){
+                $item[0]->start_time = $item[0]->start_time < $item[1]->start_time ? $item[0]->start_time : $item[1]->start_time;
+                $item[0]->end_time = $item[0]->end_time > $item[1]->end_time ? $item[0]->end_time : $item[1]->end_time;
+                unset($item[1]);
+            }
+
+            return [$item[0]];
+        });
+
+        $transformed = $mergedCollection->toArray();
+        # we need to append required conditions
+        foreach ($conditions as $key => $condition) {
+ 
+            $condition->profile = $this->profilesList[$condition->profile_id];   
+            $condition->classroom = $this->classroomsList[$condition->classroom_id];  
+            $condition->subject = $this->coursesList[$condition->course_id];  
+            $condition->field = $this->classesList[$condition->class_id];
+            // check if it is null
+            // teaching_id should be related with extra_time or normal_time but not both
+            if (count($transformed) != 0 ) {
+                if (array_key_exists($condition->teaching_id, $transformed)) {
+                    $condition->startAndEndTimeRegardingTeaching = $transformed[$condition->teaching_id][0];
+                }
+            }
+
+        }    
+
+        // sort by teaching_id
+        $collections = collect($conditions)->sortByDesc('teaching_id');
+        $collections->map(function($item, $key){
+            unset($item->class_id);
+            unset($item->classroom_id);
+            //unset($item->profile_id);
+            unset($item->created_at);
+            unset($item->updated_at);
+            unset($item->deleted_at);
+            unset($item->course_id);
+            return $item;
+        });
+
+        return $collections;      
     }
 }

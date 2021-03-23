@@ -141,6 +141,16 @@ class CourseController extends Controller
         $course->is_checked = !$course->is_checked;
         
         $course->save();
+        $event_id = school::find($formData->school_id)->LastEvent->event_id;
+        // store factor
+        factor::updateOrCreate([
+            'course_id' => $course->course_id,
+            'event_id'  => school::find($formData->school_id)->LastEvent->event_id
+        ],[
+            'course_id' => $course->course_id,
+            'event_id'  => school::find($formData->school_id)->LastEvent->event_id,
+            'factor'    => $formData->coef 
+        ]);
         return response()->json(['data' => $course, 'status' => 200]);
     }
 

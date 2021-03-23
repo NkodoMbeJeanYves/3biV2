@@ -205,17 +205,59 @@ class PeriodService {
      *  @comment retrieve dalay of period regarding teaching_id Extra tme
      */
     function getPeriodDelayByTeachingIdExtraTime(Array $teaching_ids, $school_id): Array {
+        // fetch extra_condition_id regarding teaching array
+        /*$preConfig = DB::table('extra_times')->whereIn('teaching_id', $teaching_ids)->pluck('extra_condition_id');
 
-        $results = DB::table('extra_times')->whereIn('teaching_id', $teaching_ids)
-                                                ->join('periods','extra_times.period_id','periods.period_id')
-                                                ->join('scheduled_class_periods','scheduled_class_periods.period_id','periods.period_id')
+        $extraCNTP = Db::table('extra_conditions')->whereIn('extra_condition_id', $preConfig)->get();
+                        
+        $t = [];
+        $extraCNTP->map(function($item, $key) use(&$t){
+            $t['class'][] = $item->class_id;
+            $t['classroom'][] = $item->classroom_id;
+            $t['profile'][] = $item->profile_id;
+            $t['course'][] = $item->course_id; 
+        }); */              
+
+/*        $scheduled_class_ids = DB::table('scheduled_class')
+                                ->whereIn('class_id', array_values($t['class']))
+                                ->whereIn('classroom_id', array_values($t['classroom']))
+                                ->whereIn('profile_id', array_values($t['profile']))
+                                ->whereIn('course_id', array_values($t['course']))
+                                ->pluck('scheduled_class_id');*/
+/*$s = [];
+        foreach ($t['class'] as $key => $value) {
+                    $s[] = $scheduled_class_ids = DB::table('scheduled_class')
+                                ->where('class_id', $t['class'][$key])
+                                ->where('classroom_id', $t['classroom'][$key])
+                                ->where('profile_id', $t['profile'][$key])
+                                ->where('course_id', $t['course'][$key])
+                                ->get('scheduled_class_id');
+        } */                       
+
+//return $s;
+        /*$results = DB::table('extra_times')->whereIn('teaching_id', $teaching_ids)
+                                               // ->join('periods','extra_times.period_id','periods.period_id')
+                                                //->join('scheduled_class_periods','scheduled_class_periods.period_id','periods.period_id')
                                                 ->join('scheduled_class','scheduled_class_periods.scheduled_class_id','scheduled_class.scheduled_class_id')
                                                 ->join('courses','courses.course_id','scheduled_class.course_id')
+                                                ->join('periods','periods.period_id','scheduled_class_periods.period_id')
                                                 ->where('periods.school_id', $school_id)
-                                                ->select('periods.*','teaching_id', 'course_name as subject')
+                                                ->whereIn('scheduled_class.scheduled_class_id', $scheduled_class_ids->toArray())
+                                                ->select('periods.*','teaching_id', 'course_name as subject', 'scheduled_class.*')
                                                 ->orderBy('teaching_id', 'DESC')
                                                 ->orderBy('periods.start_time', 'DESC')
-                                                ->get();
+                                                ->get();*/
+
+        $results_1 = DB::table('extra_times')->whereIn('teaching_id', $teaching_ids)
+                                       ->join('periods', 'periods.period_id', 'extra_times.period_id')
+                                       ->join('extra_conditions', 'extra_conditions.extra_condition_id', 'extra_times.extra_condition_id')
+                                       ->join('courses', 'courses.course_id', 'extra_conditions.course_id')
+                                       ->select('periods.*','teaching_id', 'extra_times.extra_condition_id','courses.course_id','courses.course_name as subject')
+                                        ->orderBy('teaching_id', 'DESC')
+                                        ->orderBy('periods.start_time', 'DESC')
+                                    ->get();
+                                            
+$results = $results_1->toArray();
 
         $curDay = $this->extractDayFromTeaching($teaching_ids);                                                                           
         $params = []; 
@@ -231,14 +273,19 @@ class PeriodService {
                     $aux->start_time = ($aux->start_time > $line->start_time) ? $line->start_time : $aux->start_time ;  
                     $aux->end_time = ($aux->end_time < $line->end_time) ? $line->end_time : $aux->end_time;
                     $flag = true;
+                    $aux->subject = $line->subject;
+                    $aux->curDay = $curDay[$teaching_id];
+                    $params[$teaching_id] = $aux;
+                }
+                if ($flag == true) {
+/*                $aux->subject = $line->subject;
+                $aux->curDay = $curDay[$teaching_id];
+                $params[$teaching_id] = $aux;*/
                 }
             }
-            if ($flag == true) {
-                $aux->subject = $line->subject;
-                $aux->curDay = $curDay[$teaching_id];
-                $params[$teaching_id] = $aux;
-            }
-        }                                    
+            
+        }
+                                    
         return $params;       
     }
 
@@ -248,13 +295,12 @@ class PeriodService {
      */
     public function extractDayFromTeaching(Array $teachings): Array {
         
-        $formattedDates = teaching::whereIn('teaching_id', $teachings)->get()->map(function($item) {
+        $formattedTeachingClassDates = [];
+        $formattedDates = teaching::whereIn('teaching_id', $teachings)->get()->map(function($item) use(&$formattedTeachingClassDates){
             $carbon = new Carbon($item->class_date);
-            return $carbon->isoFormat('dddd D MMM YY'); //saturday 21 Nov 20
+            $formattedTeachingClassDates[$item->teaching_id] = $carbon->isoFormat('dddd D MMM YY');
         });
-        
-        return $array_combine = array_combine(array_values($teachings), $formattedDates->toArray());
-        // return $formattedDates->toArray();
+        return $formattedTeachingClassDates;
     }
 
 
@@ -272,7 +318,7 @@ class PeriodService {
                                             ->orderBy('teaching_id', 'DESC')
                                             ->orderBy('periods.start_time', 'DESC')
                                             ->get();
-
+// return $results->toArray();
         $curDay = $this->extractDayFromTeaching($teaching_ids);
 
         $params = [];
@@ -290,15 +336,19 @@ class PeriodService {
                     $aux->start_time = ($aux->start_time > $line->start_time) ? $line->start_time : $aux->start_time ;  
                     $aux->end_time = ($aux->end_time < $line->end_time) ? $line->end_time : $aux->end_time;
                     $flag = true;
+                    $aux->subject = $line->subject;
+                    $aux->curDay = $curDay[$teaching_id];
+                    $params[$teaching_id] = $aux;
                 }
-
             }
-            if ($flag == true) {
+
+            /*if ($flag == true) {
                 $aux->subject = $line->subject;
                 $aux->curDay = $curDay[$teaching_id];
                 $params[$teaching_id] = $aux;
-            }
-        }    
+            }*/
+        }   
+
         return $params;       
     }
 }
